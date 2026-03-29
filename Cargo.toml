@@ -1,0 +1,14 @@
+[package]
+name = "hdmi-hal-async"
+version = "0.0.1"
+edition = "2024"
+rust-version = "1.85"
+readme = "README.md"
+license = "MPL-2.0"
+description = "Async companion to hdmi-hal: hardware abstraction traits for the HDMI stack"
+repository = "https://github.com/DracoWhitefire/hdmi-hal-async"
+keywords = ["hdmi", "hal", "embedded", "async", "no-std"]
+categories = ["embedded", "hardware-support", "no-std", "asynchronous"]
+
+[dependencies]
+hdmi-hal = "0.1"
