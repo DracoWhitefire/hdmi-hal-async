@@ -7,6 +7,10 @@
 
 #![no_std]
 #![forbid(unsafe_code)]
+// async fn in traits does not guarantee Send on the returned futures. This is intentional:
+// the crate targets single-threaded embedded executors (e.g. Embassy) where Send is not
+// required. This follows the same decision made by embedded-hal-async.
+#![allow(async_fn_in_trait)]
 
 /// PHY lane configuration traits and associated types.
 pub mod phy;

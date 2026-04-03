@@ -12,3 +12,6 @@ categories = ["embedded", "hardware-support", "no-std", "asynchronous"]
 
 [dependencies]
 hdmi-hal = "0.3"
+
+[dev-dependencies]
+pollster = { version = "0.3", features = ["macro"] }
