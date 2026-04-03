@@ -145,15 +145,3 @@ Once `hdmi-hal-async` is published, the expected downstream crates are:
 The `plumbob-async` state machine will own the largest design challenge: converting the
 four-phase polling loop into a cooperative async state machine that yields between poll
 iterations instead of spinning.
-
----
-
-## Implementation checklist
-
-- [x] `Cargo.toml` — version `0.1.0`, `hdmi-hal = "0.3"`, full publishing metadata
-- [x] `README.md` — updated from stub; describes the final API
-- [ ] Replace `src/lib.rs` stub with crate-level docs, `#![no_std]`, `#![forbid(unsafe_code)]`, and module declarations
-- [ ] Implement `src/scdc/mod.rs` — `async ScdcTransport` trait with doc comments
-- [ ] Implement `src/phy/mod.rs` — `async HdmiPhy` trait with doc comments
-- [ ] Add re-exports of `LtpPattern`, `EqParams`, `LaneEqParams` in `lib.rs`
-- [ ] Add mock-based compile/smoke tests in each module's `#[cfg(test)]` block
