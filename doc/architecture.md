@@ -96,16 +96,10 @@ a re-export here.
 
 ---
 
-## Cargo.toml changes
+## Cargo.toml
 
-The current dependency pinned to `hdmi-hal = "0.1"` predates the stable API. Update it:
-
-```toml
-[dependencies]
-hdmi-hal = "0.3"
-```
-
-No other dependencies are required. The crate must remain `#![no_std]`.
+`hdmi-hal = "0.3"` is the only dependency. No other dependencies are required. The crate
+must remain `#![no_std]`.
 
 ---
 
@@ -156,11 +150,10 @@ iterations instead of spinning.
 
 ## Implementation checklist
 
-- [ ] Update `hdmi-hal` dependency in `Cargo.toml` to `"0.3"`
+- [x] `Cargo.toml` — version `0.1.0`, `hdmi-hal = "0.3"`, full publishing metadata
+- [x] `README.md` — updated from stub; describes the final API
 - [ ] Replace `src/lib.rs` stub with crate-level docs, `#![no_std]`, `#![forbid(unsafe_code)]`, and module declarations
 - [ ] Implement `src/scdc/mod.rs` — `async ScdcTransport` trait with doc comments
 - [ ] Implement `src/phy/mod.rs` — `async HdmiPhy` trait with doc comments
 - [ ] Add re-exports of `LtpPattern`, `EqParams`, `LaneEqParams` in `lib.rs`
 - [ ] Add mock-based compile/smoke tests in each module's `#[cfg(test)]` block
-- [ ] Update `README.md` to remove the "planned stub" disclaimer and describe the final API
-- [ ] Bump crate version to `0.1.0`
