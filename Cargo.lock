@@ -30,6 +30,7 @@ dependencies = [
 name = "hdmi-hal-async"
 version = "0.1.0"
 dependencies = [
+ "display-types",
  "hdmi-hal",
  "pollster",
 ]
