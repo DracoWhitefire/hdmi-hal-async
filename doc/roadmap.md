@@ -2,23 +2,19 @@
 
 ## Released
 
+### 0.1.0
+
+- `scdc::ScdcTransport` — async mirror of `hdmi_hal::scdc::ScdcTransport`
+- `phy::HdmiPhy` — async mirror of `hdmi_hal::phy::HdmiPhy`
+- Re-exports of `LtpPattern`, `EqParams`, and `LaneEqParams` at the crate root
+- `#![no_std]`, `#![forbid(unsafe_code)]`, `#![allow(async_fn_in_trait)]`
+- Full rustdoc coverage
+
 ### 0.0.1
 
 - Name claimed in advance of implementation.
 
 ## Planned
-
-### 0.1.0
-
-The initial implementation:
-
-- `scdc::ScdcTransport` — async mirror of `hdmi_hal::scdc::ScdcTransport`, with `async fn read`
-  and `async fn write`
-- `phy::HdmiPhy` — async mirror of `hdmi_hal::phy::HdmiPhy`, with `async fn` for all four
-  methods
-- Re-exports of `LtpPattern`, `EqParams`, and `LaneEqParams` from `hdmi-hal`
-- `#![no_std]`, `#![forbid(unsafe_code)]`
-- Full rustdoc coverage enforced via `cargo rustdoc -- -D missing_docs`
 
 ### culvert-async
 
