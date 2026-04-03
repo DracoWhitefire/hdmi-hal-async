@@ -44,9 +44,10 @@ known consumers in the stack.
 
 ## Publishing and downstream dependencies
 
-hdmi-hal is consumed by `scdc`, `frl-training`, and platform backend crates as a
-versioned dependency. Changes that add or modify public API must be merged, tagged, and
-published to crates.io before downstream crates can adopt them. The workflow is:
+`hdmi-hal-async` is consumed by `culvert-async`, `plumbob-async`, and async platform
+backend crates as a versioned dependency. Changes that add or modify public API must be
+merged, tagged, and published to crates.io before downstream crates can adopt them.
+The workflow is:
 
 1. Merge and tag a release in this repo (`vX.Y.Z`).
 2. The publish CI workflow uploads the new version to crates.io.
