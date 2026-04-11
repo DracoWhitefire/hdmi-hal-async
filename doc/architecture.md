@@ -133,6 +133,17 @@ appropriate for the test harness. Because the crate itself is `no_std`, tests ca
 
 ---
 
+## Release integrity
+
+Every release is published through a GitHub Actions workflow that signs the `.crate`
+package with [SLSA Build Level 2](https://slsa.dev) provenance. Verify with:
+
+```sh
+gh attestation verify hdmi-hal-async-X.Y.Z.crate --repo DracoWhitefire/hdmi-hal-async
+```
+
+---
+
 ## Future consumers
 
 Once `hdmi-hal-async` is published, the expected downstream crates are:
