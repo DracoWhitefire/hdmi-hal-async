@@ -7,11 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-05-23
+
+### Breaking changes
+
+- **`ScdcTransport::read` now takes `&self` instead of `&mut self`.** Mirrors the
+  same change in `hdmi-hal`. Implementations must change `async fn read(&mut self, reg: u8)`
+  to `async fn read(&self, reg: u8)` and introduce interior mutability for any state
+  mutated during reads.
+
 ### Added
 
 - **SLSA Build Level 2 provenance** — release artifacts are attested via
   `actions/attest-build-provenance` and verified with
   `gh attestation verify <file> --repo DracoWhitefire/hdmi-hal-async`.
+
+### Changed
+
+- **`hdmi-hal` updated to 0.4.1** — aligns with display-types 0.4 across the stack.
+- **`display-types` updated to 0.4** — tracks DisplayID 2.x support added in `piaf` 0.4.1.
 
 ## [0.1.0] - 2026-04-03
 
