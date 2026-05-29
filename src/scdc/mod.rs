@@ -15,7 +15,7 @@ pub trait ScdcTransport {
     type Error;
 
     /// Read a single byte from the given SCDC register address.
-    async fn read(&mut self, reg: u8) -> Result<u8, Self::Error>;
+    async fn read(&self, reg: u8) -> Result<u8, Self::Error>;
 
     /// Write a single byte to the given SCDC register address.
     async fn write(&mut self, reg: u8, value: u8) -> Result<(), Self::Error>;
@@ -40,7 +40,7 @@ mod tests {
     impl ScdcTransport for MockTransport {
         type Error = core::convert::Infallible;
 
-        async fn read(&mut self, reg: u8) -> Result<u8, Self::Error> {
+        async fn read(&self, reg: u8) -> Result<u8, Self::Error> {
             Ok(self.registers[reg as usize])
         }
 
