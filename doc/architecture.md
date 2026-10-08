@@ -9,8 +9,8 @@ in `hdmi-hal`:
 - `scdc::ScdcTransport` — raw byte-level SCDC register access
 - `phy::HdmiPhy` — PHY lane configuration
 
-Data types (`LtpPattern`, `LanePatterns`, `EqParams`, `LaneEqParams`) are defined in
-`hdmi-hal` and re-exported here; they are not duplicated.
+Data types (`LtpPattern`, `LanePatterns`, `EqParams`, `LaneEqParams`, `TxFfeLevel`) are
+defined in `hdmi-hal` and re-exported here; they are not duplicated.
 
 The crate is traits-only. No implementations live here.
 
@@ -87,7 +87,7 @@ Data types that live in `hdmi-hal` and are used in trait signatures must be re-e
 so callers have a single import path. The following should appear in `lib.rs`:
 
 ```rust
-pub use hdmi_hal::phy::{EqParams, LaneEqParams, LanePatterns, LtpPattern};
+pub use hdmi_hal::phy::{EqParams, LaneEqParams, LanePatterns, LtpPattern, TxFfeLevel};
 ```
 
 `HdmiForumFrl` is already accessible through `display-types`; if it appears as a trait

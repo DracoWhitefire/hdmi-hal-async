@@ -29,12 +29,13 @@ pub trait HdmiPhy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hdmi_hal::phy::LtpPattern;
+    use hdmi_hal::phy::{LtpPattern, TxFfeLevel};
 
     struct MockPhy {
         frl_rate: Option<HdmiForumFrl>,
         scrambling: Option<bool>,
         eq_calls: u32,
+        last_eq: Option<EqParams>,
         last_ltp: Option<LanePatterns>,
     }
 
@@ -44,6 +45,7 @@ mod tests {
                 frl_rate: None,
                 scrambling: None,
                 eq_calls: 0,
+                last_eq: None,
                 last_ltp: None,
             }
         }
@@ -62,8 +64,9 @@ mod tests {
             Ok(())
         }
 
-        async fn adjust_equalization(&mut self, _params: EqParams) -> Result<(), Self::Error> {
+        async fn adjust_equalization(&mut self, params: EqParams) -> Result<(), Self::Error> {
             self.eq_calls += 1;
+            self.last_eq = Some(params);
             Ok(())
         }
 
@@ -150,6 +153,18 @@ mod tests {
         phy.set_scrambling(true).await.unwrap();
         phy.set_scrambling(false).await.unwrap();
         assert_eq!(phy.scrambling, Some(false));
+    }
+
+    #[pollster::test]
+    async fn adjust_equalization_records_per_lane_levels() {
+        let mut phy = MockPhy::new();
+        let mut params = EqParams::new();
+        params.lane1.tx_ffe_level = TxFfeLevel::MAX;
+        phy.adjust_equalization(params).await.unwrap();
+        let last = phy.last_eq.unwrap();
+        assert_eq!(last, params);
+        assert_eq!(last.lane0.tx_ffe_level.value(), 0);
+        assert_eq!(last.lane1.tx_ffe_level.value(), 7);
     }
 
     #[pollster::test]

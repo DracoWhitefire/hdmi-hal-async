@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `LanePatterns` re-exported from `hdmi-hal` at the crate root.
+- `TxFfeLevel` re-exported from `hdmi-hal` at the crate root. `LaneEqParams` (from
+  `hdmi-hal`) now carries the lane's TxFFE level as `tx_ffe_level`, applied through
+  `HdmiPhy::adjust_equalization`.
 
 ## [0.2.0] - 2026-05-23
 
