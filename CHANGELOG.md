@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   was wrong: the values are 1 = all ones, 2 = all zeros, 3 = Nyquist clock, 4 = DDE
   compliance and 5–8 = LFSR 0–3. `LtpPattern::new(u8)` is removed; use the variants
   (`LtpPattern::Lfsr0` etc.).
+- **`HdmiPhy::send_ltp` takes the full per-lane pattern set**, mirroring `hdmi-hal`: the
+  signature is now `async fn send_ltp(&mut self, patterns: LanePatterns)`. `None` on a
+  lane means no training pattern; `None` on every lane stops the training patterns.
+
+### Added
+
+- `LanePatterns` re-exported from `hdmi-hal` at the crate root.
 
 ## [0.2.0] - 2026-05-23
 

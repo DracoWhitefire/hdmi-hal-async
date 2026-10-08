@@ -9,8 +9,8 @@ in `hdmi-hal`:
 - `scdc::ScdcTransport` — raw byte-level SCDC register access
 - `phy::HdmiPhy` — PHY lane configuration
 
-Data types (`LtpPattern`, `EqParams`, `LaneEqParams`) are defined in `hdmi-hal` and
-re-exported here; they are not duplicated.
+Data types (`LtpPattern`, `LanePatterns`, `EqParams`, `LaneEqParams`) are defined in
+`hdmi-hal` and re-exported here; they are not duplicated.
 
 The crate is traits-only. No implementations live here.
 
@@ -70,14 +70,14 @@ pub trait HdmiPhy {
     type Error;
 
     async fn set_frl_rate(&mut self, rate: HdmiForumFrl) -> Result<(), Self::Error>;
-    async fn send_ltp(&mut self, pattern: LtpPattern) -> Result<(), Self::Error>;
+    async fn send_ltp(&mut self, patterns: LanePatterns) -> Result<(), Self::Error>;
     async fn adjust_equalization(&mut self, params: EqParams) -> Result<(), Self::Error>;
     async fn set_scrambling(&mut self, enabled: bool) -> Result<(), Self::Error>;
 }
 ```
 
 `HdmiForumFrl` comes from `display-types` via re-export in `hdmi-hal`.
-`LtpPattern` and `EqParams` are re-exported from `hdmi-hal` (see below).
+`LanePatterns`, `LtpPattern` and `EqParams` are re-exported from `hdmi-hal` (see below).
 
 ---
 
@@ -87,7 +87,7 @@ Data types that live in `hdmi-hal` and are used in trait signatures must be re-e
 so callers have a single import path. The following should appear in `lib.rs`:
 
 ```rust
-pub use hdmi_hal::phy::{EqParams, LaneEqParams, LtpPattern};
+pub use hdmi_hal::phy::{EqParams, LaneEqParams, LanePatterns, LtpPattern};
 ```
 
 `HdmiForumFrl` is already accessible through `display-types`; if it appears as a trait

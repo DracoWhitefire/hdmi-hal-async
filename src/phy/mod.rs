@@ -1,5 +1,5 @@
 use display_types::cea861::hdmi_forum::HdmiForumFrl;
-use hdmi_hal::phy::{EqParams, LtpPattern};
+use hdmi_hal::phy::{EqParams, LanePatterns};
 
 /// Async PHY lane configuration for an HDMI 2.1 transmitter or receiver.
 ///
@@ -16,8 +16,8 @@ pub trait HdmiPhy {
     /// Select the FRL rate (or TMDS). Triggers the required lane reconfiguration sequence.
     async fn set_frl_rate(&mut self, rate: HdmiForumFrl) -> Result<(), Self::Error>;
 
-    /// Drive the given link training pattern on the physical lanes.
-    async fn send_ltp(&mut self, pattern: LtpPattern) -> Result<(), Self::Error>;
+    /// Drive the given link training patterns on the physical lanes, one per lane.
+    async fn send_ltp(&mut self, patterns: LanePatterns) -> Result<(), Self::Error>;
 
     /// Adjust equalization parameters after link training feedback.
     async fn adjust_equalization(&mut self, params: EqParams) -> Result<(), Self::Error>;
@@ -29,12 +29,13 @@ pub trait HdmiPhy {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use hdmi_hal::phy::LtpPattern;
 
     struct MockPhy {
         frl_rate: Option<HdmiForumFrl>,
         scrambling: Option<bool>,
         eq_calls: u32,
-        last_ltp: Option<LtpPattern>,
+        last_ltp: Option<LanePatterns>,
     }
 
     impl MockPhy {
@@ -56,8 +57,8 @@ mod tests {
             Ok(())
         }
 
-        async fn send_ltp(&mut self, pattern: LtpPattern) -> Result<(), Self::Error> {
-            self.last_ltp = Some(pattern);
+        async fn send_ltp(&mut self, patterns: LanePatterns) -> Result<(), Self::Error> {
+            self.last_ltp = Some(patterns);
             Ok(())
         }
 
@@ -73,18 +74,32 @@ mod tests {
     }
 
     #[pollster::test]
-    async fn send_ltp_records_pattern() {
+    async fn send_ltp_records_patterns() {
         let mut phy = MockPhy::new();
-        phy.send_ltp(LtpPattern::Lfsr0).await.unwrap();
-        assert_eq!(phy.last_ltp, Some(LtpPattern::Lfsr0));
+        let patterns = LanePatterns {
+            lane0: Some(LtpPattern::Lfsr0),
+            lane1: Some(LtpPattern::Lfsr1),
+            lane2: Some(LtpPattern::Lfsr2),
+            lane3: None,
+        };
+        phy.send_ltp(patterns).await.unwrap();
+        assert_eq!(phy.last_ltp, Some(patterns));
     }
 
     #[pollster::test]
     async fn send_ltp_updates_on_each_call() {
         let mut phy = MockPhy::new();
-        phy.send_ltp(LtpPattern::Lfsr0).await.unwrap();
-        phy.send_ltp(LtpPattern::Lfsr2).await.unwrap();
-        assert_eq!(phy.last_ltp, Some(LtpPattern::Lfsr2));
+        let first = LanePatterns {
+            lane0: Some(LtpPattern::Lfsr0),
+            ..LanePatterns::default()
+        };
+        let second = LanePatterns {
+            lane0: Some(LtpPattern::NyquistClock),
+            ..first
+        };
+        phy.send_ltp(first).await.unwrap();
+        phy.send_ltp(second).await.unwrap();
+        assert_eq!(phy.last_ltp, Some(second));
     }
 
     #[pollster::test]
