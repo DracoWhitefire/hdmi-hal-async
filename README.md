@@ -36,7 +36,7 @@ struct MyAsyncI2cBackend { /* ... */ }
 impl ScdcTransport for MyAsyncI2cBackend {
     type Error = MyError;
 
-    async fn read(&mut self, reg: u8) -> Result<u8, MyError> { /* ... */ }
+    async fn read(&self, reg: u8) -> Result<u8, MyError> { /* ... */ }
     async fn write(&mut self, reg: u8, value: u8) -> Result<(), MyError> { /* ... */ }
 }
 ```

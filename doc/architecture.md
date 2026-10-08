@@ -104,8 +104,9 @@ a re-export here.
 
 ## Cargo.toml
 
-`hdmi-hal = "0.3"` is the only dependency. No other dependencies are required. The crate
-must remain `#![no_std]`.
+`hdmi-hal` (for the shared data types) and `display-types` (for `HdmiForumFrl` in the
+`HdmiPhy` signature) are the only dependencies. No other dependencies are required. The
+crate must remain `#![no_std]`.
 
 ---
 
