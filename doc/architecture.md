@@ -53,8 +53,11 @@ Async version of `hdmi_hal::scdc::ScdcTransport`. Identical semantics; only the
 pub trait ScdcTransport {
     type Error;
 
-    async fn read(&mut self, reg: u8) -> Result<u8, Self::Error>;
+    async fn read(&self, reg: u8) -> Result<u8, Self::Error>;
     async fn write(&mut self, reg: u8, value: u8) -> Result<(), Self::Error>;
+
+    /// Default: one `read` per byte. Override for a single burst transaction.
+    async fn read_block(&self, reg: u8, buf: &mut [u8]) -> Result<(), Self::Error> { ... }
 }
 ```
 

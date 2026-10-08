@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TxFfeLevel` re-exported from `hdmi-hal` at the crate root. `LaneEqParams` (from
   `hdmi-hal`) now carries the lane's TxFFE level as `tx_ffe_level`, applied through
   `HdmiPhy::adjust_equalization`.
+- `ScdcTransport::read_block(reg, buf)`, mirroring `hdmi-hal` — reads consecutive
+  registers into `buf`. The default implementation calls `read` once per byte, so existing
+  transports need no changes; transports that can burst-read should override it.
 
 ### Changed
 
