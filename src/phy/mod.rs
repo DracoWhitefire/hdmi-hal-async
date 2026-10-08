@@ -75,16 +75,16 @@ mod tests {
     #[pollster::test]
     async fn send_ltp_records_pattern() {
         let mut phy = MockPhy::new();
-        phy.send_ltp(LtpPattern::new(1)).await.unwrap();
-        assert_eq!(phy.last_ltp, Some(LtpPattern::new(1)));
+        phy.send_ltp(LtpPattern::Lfsr0).await.unwrap();
+        assert_eq!(phy.last_ltp, Some(LtpPattern::Lfsr0));
     }
 
     #[pollster::test]
     async fn send_ltp_updates_on_each_call() {
         let mut phy = MockPhy::new();
-        phy.send_ltp(LtpPattern::new(1)).await.unwrap();
-        phy.send_ltp(LtpPattern::new(3)).await.unwrap();
-        assert_eq!(phy.last_ltp, Some(LtpPattern::new(3)));
+        phy.send_ltp(LtpPattern::Lfsr0).await.unwrap();
+        phy.send_ltp(LtpPattern::Lfsr2).await.unwrap();
+        assert_eq!(phy.last_ltp, Some(LtpPattern::Lfsr2));
     }
 
     #[pollster::test]
