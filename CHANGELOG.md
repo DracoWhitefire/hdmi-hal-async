@@ -17,13 +17,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`HdmiPhy::send_ltp` takes the full per-lane pattern set**, mirroring `hdmi-hal`: the
   signature is now `async fn send_ltp(&mut self, patterns: LanePatterns)`. `None` on a
   lane means no training pattern; `None` on every lane stops the training patterns.
+- **`HdmiPhy::set_frl_output` is a new required method**, mirroring `hdmi-hal`: existing
+  implementations must add
+  `async fn set_frl_output(&mut self, output: FrlOutput) -> Result<(), Self::Error>`. It
+  selects gap-only output during link training and active output once training has
+  succeeded.
 
 ### Added
 
 - `LanePatterns` re-exported from `hdmi-hal` at the crate root.
+- `FrlOutput` re-exported from `hdmi-hal` at the crate root.
 - `TxFfeLevel` re-exported from `hdmi-hal` at the crate root. `LaneEqParams` (from
   `hdmi-hal`) now carries the lane's TxFFE level as `tx_ffe_level`, applied through
   `HdmiPhy::adjust_equalization`.
+
+### Changed
+
+- `HdmiPhy`'s documentation now describes it as covering the transmitter's link-level
+  FRL and TMDS behaviour as well as analog lane configuration, matching `hdmi-hal`.
 
 ## [0.2.0] - 2026-05-23
 

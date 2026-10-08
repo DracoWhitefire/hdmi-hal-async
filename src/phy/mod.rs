@@ -1,14 +1,15 @@
 use display_types::cea861::hdmi_forum::HdmiForumFrl;
-use hdmi_hal::phy::{EqParams, LanePatterns};
+use hdmi_hal::phy::{EqParams, FrlOutput, LanePatterns};
 
-/// Async PHY lane configuration for an HDMI 2.1 transmitter or receiver.
+/// Async link-level and analog lane control for an HDMI 2.1 transmitter PHY.
 ///
 /// This is the async counterpart to `hdmi_hal::phy::HdmiPhy`. The trait contract is
 /// identical; only the method signatures gain `async`.
 ///
-/// Abstracts the register sequences required to configure an HDMI 2.1 PHY: lane
-/// mapping, pre-emphasis, equalization, scrambling, and FRL rate selection.
-/// Vendor-specific register sequences are an implementation detail of each backend.
+/// Covers the transmitter's link-level FRL and TMDS behaviour (FRL rate selection, link
+/// training patterns, FRL output mode and scrambling) as well as analog lane
+/// configuration (lane mapping, pre-emphasis and equalization). Vendor-specific register
+/// sequences are an implementation detail of each backend.
 pub trait HdmiPhy {
     /// Error type returned by PHY operations.
     type Error;
@@ -18,6 +19,10 @@ pub trait HdmiPhy {
 
     /// Drive the given link training patterns on the physical lanes, one per lane.
     async fn send_ltp(&mut self, patterns: LanePatterns) -> Result<(), Self::Error>;
+
+    /// Select what the transmitter sends on the FRL lanes: gap characters only, or video,
+    /// data islands and control periods.
+    async fn set_frl_output(&mut self, output: FrlOutput) -> Result<(), Self::Error>;
 
     /// Adjust equalization parameters after link training feedback.
     async fn adjust_equalization(&mut self, params: EqParams) -> Result<(), Self::Error>;
@@ -36,6 +41,7 @@ mod tests {
         scrambling: Option<bool>,
         eq_calls: u32,
         last_eq: Option<EqParams>,
+        frl_output: Option<FrlOutput>,
         last_ltp: Option<LanePatterns>,
     }
 
@@ -46,6 +52,7 @@ mod tests {
                 scrambling: None,
                 eq_calls: 0,
                 last_eq: None,
+                frl_output: None,
                 last_ltp: None,
             }
         }
@@ -61,6 +68,11 @@ mod tests {
 
         async fn send_ltp(&mut self, patterns: LanePatterns) -> Result<(), Self::Error> {
             self.last_ltp = Some(patterns);
+            Ok(())
+        }
+
+        async fn set_frl_output(&mut self, output: FrlOutput) -> Result<(), Self::Error> {
+            self.frl_output = Some(output);
             Ok(())
         }
 
@@ -153,6 +165,21 @@ mod tests {
         phy.set_scrambling(true).await.unwrap();
         phy.set_scrambling(false).await.unwrap();
         assert_eq!(phy.scrambling, Some(false));
+    }
+
+    #[pollster::test]
+    async fn set_frl_output_records_mode() {
+        let mut phy = MockPhy::new();
+        phy.set_frl_output(FrlOutput::GapOnly).await.unwrap();
+        assert_eq!(phy.frl_output, Some(FrlOutput::GapOnly));
+    }
+
+    #[pollster::test]
+    async fn set_frl_output_can_be_switched() {
+        let mut phy = MockPhy::new();
+        phy.set_frl_output(FrlOutput::GapOnly).await.unwrap();
+        phy.set_frl_output(FrlOutput::Active).await.unwrap();
+        assert_eq!(phy.frl_output, Some(FrlOutput::Active));
     }
 
     #[pollster::test]

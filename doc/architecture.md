@@ -7,10 +7,11 @@ as `embedded-hal` / `embedded-hal-async`. It defines async versions of the two t
 in `hdmi-hal`:
 
 - `scdc::ScdcTransport` — raw byte-level SCDC register access
-- `phy::HdmiPhy` — PHY lane configuration
+- `phy::HdmiPhy` — transmitter PHY control: FRL rate, link training patterns, FRL output
+  mode, scrambling and equalization
 
-Data types (`LtpPattern`, `LanePatterns`, `EqParams`, `LaneEqParams`, `TxFfeLevel`) are
-defined in `hdmi-hal` and re-exported here; they are not duplicated.
+Data types (`LtpPattern`, `LanePatterns`, `FrlOutput`, `EqParams`, `LaneEqParams`,
+`TxFfeLevel`) are defined in `hdmi-hal` and re-exported here; they are not duplicated.
 
 The crate is traits-only. No implementations live here.
 
@@ -62,7 +63,7 @@ async counterpart.
 
 ### `phy::HdmiPhy`
 
-Async version of `hdmi_hal::phy::HdmiPhy`. Same four methods, same parameter types,
+Async version of `hdmi_hal::phy::HdmiPhy`. Same methods, same parameter types,
 same semantics.
 
 ```rust
@@ -71,13 +72,15 @@ pub trait HdmiPhy {
 
     async fn set_frl_rate(&mut self, rate: HdmiForumFrl) -> Result<(), Self::Error>;
     async fn send_ltp(&mut self, patterns: LanePatterns) -> Result<(), Self::Error>;
+    async fn set_frl_output(&mut self, output: FrlOutput) -> Result<(), Self::Error>;
     async fn adjust_equalization(&mut self, params: EqParams) -> Result<(), Self::Error>;
     async fn set_scrambling(&mut self, enabled: bool) -> Result<(), Self::Error>;
 }
 ```
 
 `HdmiForumFrl` comes from `display-types` via re-export in `hdmi-hal`.
-`LanePatterns`, `LtpPattern` and `EqParams` are re-exported from `hdmi-hal` (see below).
+`LanePatterns`, `LtpPattern`, `FrlOutput` and `EqParams` are re-exported from `hdmi-hal`
+(see below).
 
 ---
 
@@ -87,7 +90,7 @@ Data types that live in `hdmi-hal` and are used in trait signatures must be re-e
 so callers have a single import path. The following should appear in `lib.rs`:
 
 ```rust
-pub use hdmi_hal::phy::{EqParams, LaneEqParams, LanePatterns, LtpPattern, TxFfeLevel};
+pub use hdmi_hal::phy::{EqParams, FrlOutput, LaneEqParams, LanePatterns, LtpPattern, TxFfeLevel};
 ```
 
 `HdmiForumFrl` is already accessible through `display-types`; if it appears as a trait

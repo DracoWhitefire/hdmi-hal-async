@@ -18,4 +18,4 @@ pub mod phy;
 /// SCDC register transport trait.
 pub mod scdc;
 
-pub use hdmi_hal::phy::{EqParams, LaneEqParams, LanePatterns, LtpPattern, TxFfeLevel};
+pub use hdmi_hal::phy::{EqParams, FrlOutput, LaneEqParams, LanePatterns, LtpPattern, TxFfeLevel};
