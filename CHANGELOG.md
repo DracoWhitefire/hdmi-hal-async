@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `async fn set_frl_output(&mut self, output: FrlOutput) -> Result<(), Self::Error>`. It
   selects gap-only output during link training and active output once training has
   succeeded.
+- **`ScdcTransport::read` now takes `&self` instead of `&mut self`.** Mirrors the
+  same change in `hdmi-hal`. Implementations must change `async fn read(&mut self, reg: u8)`
+  to `async fn read(&self, reg: u8)` and introduce interior mutability for any state
+  mutated during reads.
 
 ### Added
 
@@ -33,11 +37,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ScdcTransport::read_block(reg, buf)`, mirroring `hdmi-hal` — reads consecutive
   registers into `buf`. The default implementation calls `read` once per byte, so existing
   transports need no changes; transports that can burst-read should override it.
+- **SLSA Build Level 2 provenance** — release artifacts are attested via
+  `actions/attest-build-provenance` and verified with
+  `gh attestation verify <file> --repo DracoWhitefire/hdmi-hal-async`.
 
 ### Changed
 
 - `HdmiPhy`'s documentation now describes it as covering the transmitter's link-level
   FRL and TMDS behaviour as well as analog lane configuration, matching `hdmi-hal`.
+- **`hdmi-hal` updated to 0.5** — the release with the per-lane `send_ltp`,
+  `set_frl_output` and the HDMI 2.1 `LtpPattern` values mirrored above. It uses
+  display-types 0.4, like this crate.
+- **`display-types` updated to 0.4** — tracks DisplayID 2.x support added in `piaf` 0.4.1.
 
 ### Internal
 
@@ -46,26 +57,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   available, so it could not catch a dependency that enables `std` (as hdmi-hal did
   through `display-types`).
   The publish workflow runs the same build steps.
-
-## [0.2.0] - 2026-05-23
-
-### Breaking changes
-
-- **`ScdcTransport::read` now takes `&self` instead of `&mut self`.** Mirrors the
-  same change in `hdmi-hal`. Implementations must change `async fn read(&mut self, reg: u8)`
-  to `async fn read(&self, reg: u8)` and introduce interior mutability for any state
-  mutated during reads.
-
-### Added
-
-- **SLSA Build Level 2 provenance** — release artifacts are attested via
-  `actions/attest-build-provenance` and verified with
-  `gh attestation verify <file> --repo DracoWhitefire/hdmi-hal-async`.
-
-### Changed
-
-- **`hdmi-hal` updated to 0.4.1** — aligns with display-types 0.4 across the stack.
-- **`display-types` updated to 0.4** — tracks DisplayID 2.x support added in `piaf` 0.4.1.
 
 ## [0.1.0] - 2026-04-03
 
