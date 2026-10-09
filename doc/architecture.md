@@ -106,7 +106,8 @@ a re-export here.
 
 `hdmi-hal` (for the shared data types) and `display-types` (for `HdmiForumFrl` in the
 `HdmiPhy` signature) are the only dependencies. No other dependencies are required. The
-crate must remain `#![no_std]`.
+crate must remain `#![no_std]`: dependencies are declared with `default-features = false`,
+and CI builds the crate for `thumbv7em-none-eabi`, a target without `std`.
 
 ---
 

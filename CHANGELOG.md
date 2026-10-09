@@ -39,6 +39,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `HdmiPhy`'s documentation now describes it as covering the transmitter's link-level
   FRL and TMDS behaviour as well as analog lane configuration, matching `hdmi-hal`.
 
+### Internal
+
+- **CI builds for a `no_std` target** — the `Build (no_std)` step now builds for
+  `thumbv7em-none-eabi`. It previously built for the host, where `std` is always
+  available, so it could not catch a dependency that enables `std` (as hdmi-hal did
+  through `display-types`).
+  The publish workflow runs the same build steps.
+
 ## [0.2.0] - 2026-05-23
 
 ### Breaking changes
