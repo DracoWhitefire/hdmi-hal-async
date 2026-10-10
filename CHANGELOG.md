@@ -45,6 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `HdmiPhy`'s documentation now describes it as covering the transmitter's link-level
   FRL and TMDS behaviour as well as analog lane configuration, matching `hdmi-hal`.
+- `HdmiPhy::set_frl_rate`'s documentation says it returns once the PHY transmits at the
+  rate, including any bring-up its hardware needs (such as a clock pattern held until its
+  PLL locks).
 - **`hdmi-hal` updated to 0.5** — the release with the per-lane `send_ltp`,
   `set_frl_output` and the HDMI 2.1 `LtpPattern` values mirrored above. It uses
   display-types 0.4, like this crate.

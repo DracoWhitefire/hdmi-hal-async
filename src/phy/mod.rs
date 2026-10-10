@@ -15,6 +15,11 @@ pub trait HdmiPhy {
     type Error;
 
     /// Select the FRL rate (or TMDS). Triggers the required lane reconfiguration sequence.
+    ///
+    /// Returns once the PHY transmits at `rate`, after any bring-up its hardware needs to
+    /// get there — the Xilinx HDMI 2.1 transmitter, for example, holds a Nyquist clock
+    /// pattern until its link is up. Only the PHY knows when that is, so the sequence
+    /// belongs here; the link training layer sends no pattern of its own around it.
     async fn set_frl_rate(&mut self, rate: HdmiForumFrl) -> Result<(), Self::Error>;
 
     /// Drive the given link training patterns on the physical lanes, one per lane.
