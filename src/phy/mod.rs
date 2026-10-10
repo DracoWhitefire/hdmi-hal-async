@@ -41,6 +41,10 @@ mod tests {
     use super::*;
     use hdmi_hal::phy::{LtpPattern, TxFfeLevel};
 
+    /// A minimal `HdmiPhy` that records what it is given. The tests that drive it method by
+    /// method check little beyond recording — they show that the trait can be implemented
+    /// and used for each method, and they keep this implementation covered. Behaviour is
+    /// tested where it lives: in plumbob, against its simulated PHY.
     struct MockPhy {
         frl_rate: Option<HdmiForumFrl>,
         scrambling: Option<bool>,
