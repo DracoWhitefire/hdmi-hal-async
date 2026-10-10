@@ -25,6 +25,15 @@ MSRV is `1.85`, which is well above the `1.75` stabilisation of `async fn` in tr
 AFIT-generated futures are not object-safe, which is the same trade-off `embedded-hal-async`
 accepts. Trait objects are not a goal for this HAL layer.
 
+Nor do the traits promise that their futures are `Send`. With concrete types the compiler
+sees the real futures, so a training future over `Send` implementations is `Send` and can
+be spawned on a multi-threaded executor. Code generic over `HdmiPhy` or `ScdcTransport`
+cannot spawn one, however the types are bounded; it runs on a single-threaded executor
+(Embassy, Tokio's current-thread runtime or `LocalSet`) or uses concrete types. Because
+`ScdcTransport::read` takes `&self`, a future that reads also needs the transport to be
+`Sync` to be `Send`. `Send` variants of the traits are designed and proven in
+the stack design document ("Sync and Async Companions", "`Send` futures for multi-threaded executors"), and deferred until a consumer needs them.
+
 ---
 
 ## Module structure
