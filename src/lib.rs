@@ -19,3 +19,7 @@ pub mod phy;
 pub mod scdc;
 
 pub use hdmi_hal::phy::{EqParams, FrlOutput, LaneEqParams, LanePatterns, LtpPattern, TxFfeLevel};
+
+/// The FRL rate, as `HdmiPhy::set_frl_rate` takes it; re-exported so that implementations
+/// name the same type this crate does.
+pub use hdmi_hal::HdmiForumFrl;

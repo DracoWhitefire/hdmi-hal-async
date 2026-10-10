@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `HdmiForumFrl` re-exported at the crate root, from `hdmi-hal`.
 - `LanePatterns` re-exported from `hdmi-hal` at the crate root.
 - `FrlOutput` re-exported from `hdmi-hal` at the crate root.
 - `TxFfeLevel` re-exported from `hdmi-hal` at the crate root. `LaneEqParams` (from
