@@ -105,9 +105,9 @@ so callers have a single import path. The following should appear in `lib.rs`:
 pub use hdmi_hal::phy::{EqParams, FrlOutput, LaneEqParams, LanePatterns, LtpPattern, TxFfeLevel};
 ```
 
-`HdmiForumFrl` is already accessible through `display-types`; if it appears as a trait
-bound consumers will import it from there or from `hdmi-hal` directly. It does not need
-a re-export here.
+`HdmiForumFrl`, which `HdmiPhy::set_frl_rate` takes, is re-exported at the crate root as
+well (`hdmi_hal_async::HdmiForumFrl`, from `hdmi-hal`), so a PHY implementation needs no
+direct `display-types` dependency to name it.
 
 ---
 
