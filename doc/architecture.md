@@ -136,17 +136,15 @@ and CI builds the crate for `thumbv7em-none-eabi`, a target without `std`.
 
 ## Testing
 
-Unit tests for a traits-only crate are minimal but still useful:
+Unit tests for a traits-only crate are minimal but still useful. Each trait module has a
+`#[cfg(test)]` block with a mock implementor, mirroring `hdmi-hal`: `MockTransport` in
+`scdc` and `MockPhy` in `phy`. That the mocks compile shows the trait signatures are
+well-formed and that `async fn` in traits works end to end; the tests then check the
+calls round-trip (register writes read back, `read_block`'s default, each PHY call
+recorded).
 
-- A compile-time test that a concrete mock type implementing each trait compiles correctly
-  verifies that the trait signatures are well-formed and that `async fn` in traits works
-  end-to-end.
-- Each trait module should have a `#[cfg(test)]` block with a minimal mock implementor
-  (mirroring the pattern in `hdmi-hal`) and one or two smoke-test cases.
-
-Tests must compile and pass in `no_std` with a `#[tokio::test]` or similar executor
-appropriate for the test harness. Because the crate itself is `no_std`, tests can use
-`tokio` or `embassy-executor` in dev-dependencies without pulling them into the library.
+The tests run on `pollster` (`#[pollster::test]`), a minimal blocking executor. It is a
+dev-dependency only, so the library stays `no_std` and free of any executor.
 
 ---
 
@@ -161,15 +159,13 @@ gh attestation verify hdmi-hal-async-X.Y.Z.crate --repo DracoWhitefire/hdmi-hal-
 
 ---
 
-## Future consumers
+## Consumers
 
-Once `hdmi-hal-async` is published, the expected downstream crates are:
+| Crate           | Async companion of | Uses                                                                                                                           |
+|-----------------|--------------------|--------------------------------------------------------------------------------------------------------------------------------|
+| `culvert-async` | `culvert`          | `hdmi_hal_async::scdc::ScdcTransport`                                                                                          |
+| `plumbob-async` | `plumbob`          | `hdmi_hal_async::phy::HdmiPhy`; SCDC through its own `ScdcClient` trait, which `culvert-async` implements over `ScdcTransport` |
 
-| Crate | Async analogue of | Uses |
-|---|---|---|
-| `culvert-async` | `culvert` | `hdmi_hal_async::scdc::ScdcTransport` |
-| `plumbob-async` | `plumbob` | `hdmi_hal_async::scdc::ScdcTransport` (via its own `ScdcClient`) and `hdmi_hal_async::phy::HdmiPhy` |
-
-The `plumbob-async` state machine will own the largest design challenge: converting the
-four-phase polling loop into a cooperative async state machine that yields between poll
-iterations instead of spinning.
+`plumbob-async` has no state machine of its own: it drives plumbob's (`plumbob::lts::run`,
+an `async fn`) with the async SCDC client and PHY, so training yields to the executor
+whenever an SCDC or PHY call does.

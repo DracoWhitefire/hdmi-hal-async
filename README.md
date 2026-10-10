@@ -67,6 +67,7 @@ flowchart LR
     be["async platform backends"]
 
     dt --> hal
+    dt --> async
     hal --> async
     async --> ca
     async --> pa
