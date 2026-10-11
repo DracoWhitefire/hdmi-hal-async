@@ -39,7 +39,9 @@ jobs:
       - name: Verify release commit is on develop
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          RELEASE_SHA=$(git log --grep="^Release v${VERSION}$" --format="%H" | head -1)
+          # The release PR's commit, or its squash merge ("Release vX.Y.Z (#N)").
+          RELEASE_SHA=$(git log -E --grep="^Release v${VERSION//./\\.}( \(#[0-9]+\))?$" \
+            --format="%H" | head -1)
           if [ -z "$RELEASE_SHA" ]; then
             echo "::error::No 'Release v${VERSION}' commit found on develop. Has the release PR been merged into develop?"
             exit 1
