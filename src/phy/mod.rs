@@ -1,15 +1,18 @@
 use display_types::cea861::hdmi_forum::HdmiForumFrl;
 use hdmi_hal::phy::{EqParams, FrlOutput, LanePatterns};
 
-/// Async link-level and analog lane control for an HDMI 2.1 transmitter PHY.
+/// Async link-level control of an HDMI 2.1 transmitter PHY.
 ///
 /// This is the async counterpart to `hdmi_hal::phy::HdmiPhy`. The trait contract is
 /// identical; only the method signatures gain `async`.
 ///
-/// Covers the transmitter's link-level FRL and TMDS behaviour (FRL rate selection, link
-/// training patterns, FRL output mode and scrambling) as well as analog lane
-/// configuration (lane mapping, pre-emphasis and equalization). Vendor-specific register
-/// sequences are an implementation detail of each backend.
+/// Covers what FRL link training needs from the transmitter: FRL rate selection, link
+/// training patterns, FRL output mode, scrambling, and each lane's TxFFE level (FRL's
+/// transmitter equalization, a combination of pre-shoot and de-emphasis) through
+/// [`adjust_equalization`](Self::adjust_equalization). Further PHY configuration (lane
+/// mapping, TMDS pre-emphasis and swing, spread-spectrum clocking and power states) is not
+/// covered yet; it is planned for when the mode-setting layer needs it. Vendor-specific
+/// register sequences are an implementation detail of each backend.
 pub trait HdmiPhy {
     /// Error type returned by PHY operations.
     type Error;

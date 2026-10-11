@@ -7,8 +7,8 @@ as `embedded-hal` / `embedded-hal-async`. It defines async versions of the two t
 in `hdmi-hal`:
 
 - `scdc::ScdcTransport` — raw byte-level SCDC register access
-- `phy::HdmiPhy` — transmitter PHY control: FRL rate, link training patterns, FRL output
-  mode, scrambling and equalization
+- `phy::HdmiPhy` — what FRL link training needs from the transmitter PHY: FRL rate, link
+  training patterns, FRL output mode, scrambling and each lane's TxFFE level
 
 Data types (`LtpPattern`, `LanePatterns`, `FrlOutput`, `EqParams`, `LaneEqParams`,
 `TxFfeLevel`) are defined in `hdmi-hal` and re-exported here; they are not duplicated.
@@ -93,6 +93,11 @@ pub trait HdmiPhy {
 `HdmiForumFrl` comes from `display-types` via re-export in `hdmi-hal`.
 `LanePatterns`, `LtpPattern`, `FrlOutput` and `EqParams` are re-exported from `hdmi-hal`
 (see below).
+
+**Not covered yet.** As in `hdmi-hal`, today's surface is what link training needs. Lane
+mapping, TMDS pre-emphasis and swing, spread-spectrum clocking and power states are planned
+for when the mode-setting layer needs them. They are added to `hdmi-hal` first and mirrored
+here in the same release; `doc/roadmap.md` tracks them.
 
 ---
 

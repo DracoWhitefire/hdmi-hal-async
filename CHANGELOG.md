@@ -48,8 +48,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- `HdmiPhy`'s documentation now describes it as covering the transmitter's link-level
-  FRL and TMDS behaviour as well as analog lane configuration, matching `hdmi-hal`.
+- `HdmiPhy`'s documentation now describes what it covers, matching `hdmi-hal`: what FRL
+  link training needs from the transmitter (rate, training patterns, output mode,
+  scrambling and each lane's TxFFE level). Further PHY configuration (lane mapping, TMDS
+  pre-emphasis and swing, spread-spectrum clocking, power states) is listed as planned in
+  the roadmap.
 - `HdmiPhy::set_frl_rate`'s documentation says it returns once the PHY transmits at the
   rate, including any bring-up its hardware needs (such as a clock pattern held until its
   PLL locks).

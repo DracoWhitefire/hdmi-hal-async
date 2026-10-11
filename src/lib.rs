@@ -12,7 +12,7 @@
 // required. This follows the same decision made by embedded-hal-async.
 #![allow(async_fn_in_trait)]
 
-/// PHY lane configuration traits and associated types.
+/// PHY control trait.
 pub mod phy;
 
 /// SCDC register transport trait.
