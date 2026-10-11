@@ -33,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The PHY value types (`EqParams`, `FrlOutput`, `LaneEqParams`, `LanePatterns`,
+  `LtpPattern`, `TxFfeLevel`) re-exported in `hdmi_hal_async::phy` as well, at the same
+  paths as in `hdmi-hal`'s `phy` module, so code moving between the sync and async traits
+  keeps its imports. The crate-root re-exports remain.
 - `HdmiForumFrl` re-exported at the crate root, from `hdmi-hal`.
 - `LanePatterns` re-exported from `hdmi-hal` at the crate root.
 - `FrlOutput` re-exported from `hdmi-hal` at the crate root.

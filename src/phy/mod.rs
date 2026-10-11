@@ -1,5 +1,7 @@
 use display_types::cea861::hdmi_forum::HdmiForumFrl;
-use hdmi_hal::phy::{EqParams, FrlOutput, LanePatterns};
+/// The PHY value types, at the paths `hdmi-hal` gives them (`hdmi_hal::phy::*`). They are
+/// re-exported at the crate root as well.
+pub use hdmi_hal::phy::{EqParams, FrlOutput, LaneEqParams, LanePatterns, LtpPattern, TxFfeLevel};
 
 /// Async link-level control of an HDMI 2.1 transmitter PHY.
 ///
@@ -42,7 +44,6 @@ pub trait HdmiPhy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hdmi_hal::phy::{LtpPattern, TxFfeLevel};
 
     /// A minimal `HdmiPhy` that records what it is given. The tests that drive it method by
     /// method check little beyond recording — they show that the trait can be implemented
@@ -212,5 +213,19 @@ mod tests {
         phy.adjust_equalization(EqParams::new()).await.unwrap();
         phy.adjust_equalization(EqParams::new()).await.unwrap();
         assert_eq!(phy.eq_calls, 2);
+    }
+
+    #[test]
+    fn value_types_are_hdmi_hals_at_both_paths() {
+        // `phy::` mirrors `hdmi_hal::phy::`; the crate root has the same types.
+        let pattern: crate::phy::LtpPattern = hdmi_hal::phy::LtpPattern::Lfsr0;
+        let _: crate::LtpPattern = pattern;
+        let output: crate::phy::FrlOutput = hdmi_hal::phy::FrlOutput::GapOnly;
+        let _: crate::FrlOutput = output;
+        let level: crate::phy::TxFfeLevel = crate::TxFfeLevel::MAX;
+        assert_eq!(level.value(), 7);
+        let _: crate::phy::LanePatterns = crate::LanePatterns::default();
+        let _: crate::phy::EqParams = crate::EqParams::default();
+        let _: crate::phy::LaneEqParams = crate::LaneEqParams::default();
     }
 }

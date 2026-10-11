@@ -103,12 +103,18 @@ here in the same release; `doc/roadmap.md` tracks them.
 
 ## Re-exports
 
-Data types that live in `hdmi-hal` and are used in trait signatures must be re-exported
-so callers have a single import path. The following should appear in `lib.rs`:
+Data types that live in `hdmi-hal` and are used in trait signatures are re-exported, so
+callers need no direct `hdmi-hal` dependency. They are available at two paths, as in
+`hdmi-hal`'s `phy` module and at the crate root:
 
 ```rust
+// src/phy/mod.rs: the same paths as `hdmi_hal::phy::*`
+pub use hdmi_hal::phy::{EqParams, FrlOutput, LaneEqParams, LanePatterns, LtpPattern, TxFfeLevel};
+// src/lib.rs
 pub use hdmi_hal::phy::{EqParams, FrlOutput, LaneEqParams, LanePatterns, LtpPattern, TxFfeLevel};
 ```
+
+Code moving between the sync and async traits can keep its `phy::` imports.
 
 `HdmiForumFrl`, which `HdmiPhy::set_frl_rate` takes, is re-exported at the crate root as
 well (`hdmi_hal_async::HdmiForumFrl`, from `hdmi-hal`), so a PHY implementation needs no
