@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   same change in `hdmi-hal`. Implementations must change `async fn read(&mut self, reg: u8)`
   to `async fn read(&self, reg: u8)` and introduce interior mutability for any state
   mutated during reads.
+- **`hdmi-hal` updated to 0.5** — the release with the per-lane `send_ltp`,
+  `set_frl_output` and the HDMI 2.1 `LtpPattern` values mirrored above. It uses
+  display-types 0.4, like this crate.
+- **`display-types` updated to 0.4** — tracks DisplayID 2.x support added in `piaf` 0.4.1.
 
 ### Added
 
@@ -49,10 +53,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `HdmiPhy::set_frl_rate`'s documentation says it returns once the PHY transmits at the
   rate, including any bring-up its hardware needs (such as a clock pattern held until its
   PLL locks).
-- **`hdmi-hal` updated to 0.5** — the release with the per-lane `send_ltp`,
-  `set_frl_output` and the HDMI 2.1 `LtpPattern` values mirrored above. It uses
-  display-types 0.4, like this crate.
-- **`display-types` updated to 0.4** — tracks DisplayID 2.x support added in `piaf` 0.4.1.
 
 ### Internal
 
