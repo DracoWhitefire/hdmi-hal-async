@@ -7,10 +7,11 @@ as `embedded-hal` / `embedded-hal-async`. It defines async versions of the two t
 in `hdmi-hal`:
 
 - `scdc::ScdcTransport` — raw byte-level SCDC register access
-- `phy::HdmiPhy` — PHY lane configuration
+- `phy::HdmiPhy` — what FRL link training needs from the transmitter PHY: FRL rate, link
+  training patterns, FRL output mode, scrambling and each lane's TxFFE level
 
-Data types (`LtpPattern`, `EqParams`, `LaneEqParams`) are defined in `hdmi-hal` and
-re-exported here; they are not duplicated.
+Data types (`LtpPattern`, `LanePatterns`, `FrlOutput`, `EqParams`, `LaneEqParams`,
+`TxFfeLevel`) are defined in `hdmi-hal` and re-exported here; they are not duplicated.
 
 The crate is traits-only. No implementations live here.
 
@@ -23,6 +24,15 @@ MSRV is `1.85`, which is well above the `1.75` stabilisation of `async fn` in tr
 
 AFIT-generated futures are not object-safe, which is the same trade-off `embedded-hal-async`
 accepts. Trait objects are not a goal for this HAL layer.
+
+Nor do the traits promise that their futures are `Send`. With concrete types the compiler
+sees the real futures, so a training future over `Send` implementations is `Send` and can
+be spawned on a multi-threaded executor. Code generic over `HdmiPhy` or `ScdcTransport`
+cannot spawn one, however the types are bounded; it runs on a single-threaded executor
+(Embassy, Tokio's current-thread runtime or `LocalSet`) or uses concrete types. Because
+`ScdcTransport::read` takes `&self`, a future that reads also needs the transport to be
+`Sync` to be `Send`. `Send` variants of the traits are designed and proven in
+the stack design document ("Sync and Async Companions", "`Send` futures for multi-threaded executors"), and deferred until a consumer needs them.
 
 ---
 
@@ -52,8 +62,11 @@ Async version of `hdmi_hal::scdc::ScdcTransport`. Identical semantics; only the
 pub trait ScdcTransport {
     type Error;
 
-    async fn read(&mut self, reg: u8) -> Result<u8, Self::Error>;
+    async fn read(&self, reg: u8) -> Result<u8, Self::Error>;
     async fn write(&mut self, reg: u8, value: u8) -> Result<(), Self::Error>;
+
+    /// Default: one `read` per byte. Override for a single burst transaction.
+    async fn read_block(&self, reg: u8, buf: &mut [u8]) -> Result<(), Self::Error> { ... }
 }
 ```
 
@@ -62,7 +75,7 @@ async counterpart.
 
 ### `phy::HdmiPhy`
 
-Async version of `hdmi_hal::phy::HdmiPhy`. Same four methods, same parameter types,
+Async version of `hdmi_hal::phy::HdmiPhy`. Same methods, same parameter types,
 same semantics.
 
 ```rust
@@ -70,36 +83,51 @@ pub trait HdmiPhy {
     type Error;
 
     async fn set_frl_rate(&mut self, rate: HdmiForumFrl) -> Result<(), Self::Error>;
-    async fn send_ltp(&mut self, pattern: LtpPattern) -> Result<(), Self::Error>;
+    async fn send_ltp(&mut self, patterns: LanePatterns) -> Result<(), Self::Error>;
+    async fn set_frl_output(&mut self, output: FrlOutput) -> Result<(), Self::Error>;
     async fn adjust_equalization(&mut self, params: EqParams) -> Result<(), Self::Error>;
     async fn set_scrambling(&mut self, enabled: bool) -> Result<(), Self::Error>;
 }
 ```
 
 `HdmiForumFrl` comes from `display-types` via re-export in `hdmi-hal`.
-`LtpPattern` and `EqParams` are re-exported from `hdmi-hal` (see below).
+`LanePatterns`, `LtpPattern`, `FrlOutput` and `EqParams` are re-exported from `hdmi-hal`
+(see below).
+
+**Not covered yet.** As in `hdmi-hal`, today's surface is what link training needs. Lane
+mapping, TMDS pre-emphasis and swing, spread-spectrum clocking and power states are planned
+for when the mode-setting layer needs them. They are added to `hdmi-hal` first and mirrored
+here in the same release; `doc/roadmap.md` tracks them.
 
 ---
 
 ## Re-exports
 
-Data types that live in `hdmi-hal` and are used in trait signatures must be re-exported
-so callers have a single import path. The following should appear in `lib.rs`:
+Data types that live in `hdmi-hal` and are used in trait signatures are re-exported, so
+callers need no direct `hdmi-hal` dependency. They are available at two paths, as in
+`hdmi-hal`'s `phy` module and at the crate root:
 
 ```rust
-pub use hdmi_hal::phy::{EqParams, LaneEqParams, LtpPattern};
+// src/phy/mod.rs: the same paths as `hdmi_hal::phy::*`
+pub use hdmi_hal::phy::{EqParams, FrlOutput, LaneEqParams, LanePatterns, LtpPattern, TxFfeLevel};
+// src/lib.rs
+pub use hdmi_hal::phy::{EqParams, FrlOutput, LaneEqParams, LanePatterns, LtpPattern, TxFfeLevel};
 ```
 
-`HdmiForumFrl` is already accessible through `display-types`; if it appears as a trait
-bound consumers will import it from there or from `hdmi-hal` directly. It does not need
-a re-export here.
+Code moving between the sync and async traits can keep its `phy::` imports.
+
+`HdmiForumFrl`, which `HdmiPhy::set_frl_rate` takes, is re-exported at the crate root as
+well (`hdmi_hal_async::HdmiForumFrl`, from `hdmi-hal`), so a PHY implementation needs no
+direct `display-types` dependency to name it.
 
 ---
 
 ## Cargo.toml
 
-`hdmi-hal = "0.3"` is the only dependency. No other dependencies are required. The crate
-must remain `#![no_std]`.
+`hdmi-hal` (for the shared data types) and `display-types` (for `HdmiForumFrl` in the
+`HdmiPhy` signature) are the only dependencies. No other dependencies are required. The
+crate must remain `#![no_std]`: dependencies are declared with `default-features = false`,
+and CI builds the crate for `thumbv7em-none-eabi`, a target without `std`.
 
 ---
 
@@ -119,17 +147,15 @@ must remain `#![no_std]`.
 
 ## Testing
 
-Unit tests for a traits-only crate are minimal but still useful:
+Unit tests for a traits-only crate are minimal but still useful. Each trait module has a
+`#[cfg(test)]` block with a mock implementor, mirroring `hdmi-hal`: `MockTransport` in
+`scdc` and `MockPhy` in `phy`. That the mocks compile shows the trait signatures are
+well-formed and that `async fn` in traits works end to end; the tests then check the
+calls round-trip (register writes read back, `read_block`'s default, each PHY call
+recorded).
 
-- A compile-time test that a concrete mock type implementing each trait compiles correctly
-  verifies that the trait signatures are well-formed and that `async fn` in traits works
-  end-to-end.
-- Each trait module should have a `#[cfg(test)]` block with a minimal mock implementor
-  (mirroring the pattern in `hdmi-hal`) and one or two smoke-test cases.
-
-Tests must compile and pass in `no_std` with a `#[tokio::test]` or similar executor
-appropriate for the test harness. Because the crate itself is `no_std`, tests can use
-`tokio` or `embassy-executor` in dev-dependencies without pulling them into the library.
+The tests run on `pollster` (`#[pollster::test]`), a minimal blocking executor. It is a
+dev-dependency only, so the library stays `no_std` and free of any executor.
 
 ---
 
@@ -144,15 +170,13 @@ gh attestation verify hdmi-hal-async-X.Y.Z.crate --repo DracoWhitefire/hdmi-hal-
 
 ---
 
-## Future consumers
+## Consumers
 
-Once `hdmi-hal-async` is published, the expected downstream crates are:
+| Crate           | Async companion of | Uses                                                                                                                           |
+|-----------------|--------------------|--------------------------------------------------------------------------------------------------------------------------------|
+| `culvert-async` | `culvert`          | `hdmi_hal_async::scdc::ScdcTransport`                                                                                          |
+| `plumbob-async` | `plumbob`          | `hdmi_hal_async::phy::HdmiPhy`; SCDC through its own `ScdcClient` trait, which `culvert-async` implements over `ScdcTransport` |
 
-| Crate | Async analogue of | Uses |
-|---|---|---|
-| `culvert-async` | `culvert` | `hdmi_hal_async::scdc::ScdcTransport` |
-| `plumbob-async` | `plumbob` | `hdmi_hal_async::scdc::ScdcTransport` (via its own `ScdcClient`) and `hdmi_hal_async::phy::HdmiPhy` |
-
-The `plumbob-async` state machine will own the largest design challenge: converting the
-four-phase polling loop into a cooperative async state machine that yields between poll
-iterations instead of spinning.
+`plumbob-async` has no state machine of its own: it drives plumbob's (`plumbob::lts::run`,
+an `async fn`) with the async SCDC client and PHY, so training yields to the executor
+whenever an SCDC or PHY call does.

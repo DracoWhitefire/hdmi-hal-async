@@ -7,11 +7,108 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-11
+
+### Breaking changes
+
+- **`LtpPattern` is now a `#[non_exhaustive]` enum with the HDMI 2.1 pattern values**,
+  following `hdmi-hal`. The re-exported type previously documented 1–4 as LFSR 0–3, which
+  was wrong: the values are 1 = all ones, 2 = all zeros, 3 = Nyquist clock, 4 = DDE
+  compliance and 5–8 = LFSR 0–3. `LtpPattern::new(u8)` is removed; use the variants
+  (`LtpPattern::Lfsr0` etc.).
+- **`HdmiPhy::send_ltp` takes the full per-lane pattern set**, mirroring `hdmi-hal`: the
+  signature is now `async fn send_ltp(&mut self, patterns: LanePatterns)`. `None` on a
+  lane means no training pattern; `None` on every lane stops the training patterns.
+- **`HdmiPhy::set_frl_output` is a new required method**, mirroring `hdmi-hal`: existing
+  implementations must add
+  `async fn set_frl_output(&mut self, output: FrlOutput) -> Result<(), Self::Error>`. It
+  selects gap-only output during link training and active output once training has
+  succeeded.
+- **`ScdcTransport::read` now takes `&self` instead of `&mut self`.** Mirrors the
+  same change in `hdmi-hal`. Implementations must change `async fn read(&mut self, reg: u8)`
+  to `async fn read(&self, reg: u8)` and introduce interior mutability for any state
+  mutated during reads.
+- **`hdmi-hal` updated to 0.5** — the release with the per-lane `send_ltp`,
+  `set_frl_output` and the HDMI 2.1 `LtpPattern` values mirrored above. It uses
+  display-types 0.4, like this crate.
+- **`display-types` updated to 0.4** — tracks DisplayID 2.x support added in `piaf` 0.4.1.
+
 ### Added
 
+- The PHY value types (`EqParams`, `FrlOutput`, `LaneEqParams`, `LanePatterns`,
+  `LtpPattern`, `TxFfeLevel`) re-exported in `hdmi_hal_async::phy` as well, at the same
+  paths as in `hdmi-hal`'s `phy` module, so code moving between the sync and async traits
+  keeps its imports. The crate-root re-exports remain.
+- `HdmiForumFrl` re-exported at the crate root, from `hdmi-hal`.
+- `LanePatterns` re-exported from `hdmi-hal` at the crate root.
+- `FrlOutput` re-exported from `hdmi-hal` at the crate root.
+- `TxFfeLevel` re-exported from `hdmi-hal` at the crate root. `LaneEqParams` (from
+  `hdmi-hal`) now carries the lane's TxFFE level as `tx_ffe_level`, applied through
+  `HdmiPhy::adjust_equalization`.
+- `ScdcTransport::read_block(reg, buf)`, mirroring `hdmi-hal` — reads consecutive
+  registers into `buf`. The default implementation calls `read` once per byte, so existing
+  transports need no changes; transports that can burst-read should override it.
 - **SLSA Build Level 2 provenance** — release artifacts are attested via
   `actions/attest-build-provenance` and verified with
   `gh attestation verify <file> --repo DracoWhitefire/hdmi-hal-async`.
+
+### Changed
+
+- `HdmiPhy`'s documentation now describes what it covers, matching `hdmi-hal`: what FRL
+  link training needs from the transmitter (rate, training patterns, output mode,
+  scrambling and each lane's TxFFE level). Further PHY configuration (lane mapping, TMDS
+  pre-emphasis and swing, spread-spectrum clocking, power states) is listed as planned in
+  the roadmap.
+- `HdmiPhy::set_frl_rate`'s documentation says it returns once the PHY transmits at the
+  rate, including any bring-up its hardware needs (such as a clock pattern held until its
+  PLL locks).
+
+### Internal
+
+- **CI builds for a `no_std` target** — the `Build (no_std)` step now builds for
+  `thumbv7em-none-eabi`. It previously built for the host, where `std` is always
+  available, so it could not catch a dependency that enables `std` (as hdmi-hal did
+  through `display-types`).
+  The publish workflow runs the same build steps.
+- **Publishing uses crates.io trusted publishing** — `publish.yml` obtains a short-lived
+  token through OIDC (`rust-lang/crates-io-auth-action`, revoked at the end of the job, and
+  short-lived regardless) instead of the long-lived `CARGO_REGISTRY_TOKEN` secret. The
+  upload job runs in the `release` environment, which only `v*` tags can deploy to and
+  which requires a maintainer's approval. Quality gates moved to a separate `verify` job,
+  so no dependency build scripts run and no cache is restored where publishing credentials
+  exist. The attested `.crate` is kept as a separate copy; after upload the job fails if
+  crates.io's checksum differs from it, and that same copy is attached to the GitHub
+  release. Re-running a partially failed publish reuses an existing GitHub release.
+  `publish.yml` refuses tags that do not match the `Cargo.toml` version.
+- **Release summary before approval** — `publish.yml` gains a `summary` job that shows the
+  crate, version and commit, changes since the previous published release (ignoring
+  pre-release or malformed tags, and flagging a baseline that is not on crates.io), changes
+  to workflow, toolchain and build configuration, manifest changes, the changelog section,
+  and the `.crate` sha256 with a command to reproduce it, on the run page while the publish
+  job waits for approval. The publish job refuses to attest a package whose sha256 differs
+  from the reviewed one.
+- **Release prep and tagging workflows** — releases no longer need a manual promotion.
+  `release-prep` picks the version bump with `cargo semver-checks` (or validates a chosen
+  one), stamps the changelog and opens a `Release vX.Y.Z` PR into `develop`. `release-tag`
+  then promotes `develop` to `main` through a `release-promote/v*` PR, tags only when `main`
+  holds exactly the promoted tree, and dispatches `publish.yml` for the tag (which
+  `workflow_dispatch` now allows; dispatches against a non-tag ref are skipped). Both fail
+  when started from a branch other than `develop`.
+- **No CI run on promotion PRs** — CI no longer runs on pull requests into `main`. The only
+  ones are `release-tag`'s `release-promote/*` PRs, whose content already passed CI on
+  `develop`; opened by `github-actions[bot]`, their runs would be held for approval and
+  listed as `action_required` or failed.
+- **Supply-chain hardening for CI** — every third-party action is pinned to a commit SHA
+  of a release tag, with `dependabot.yml` keeping the pins (and `Cargo.lock`) current. The
+  Rust toolchain itself still follows `stable`. `cargo-semver-checks` is installed as a
+  checksum-verified prebuilt binary (the version listed by the pinned `install-action`).
+  The security audit also runs weekly.
+- **README documents release provenance** — a badge shows whether crates.io requires trusted
+  publishing for this crate, and "Verifying releases" now states which versions carry SLSA
+  provenance and a GitHub release (from 0.2.0, not every release as it previously claimed),
+  that releases from 0.2.0 are uploaded through trusted publishing while 0.0.1 and 0.1.0
+  were uploaded with an API token, and how to look up a version's publishing details on
+  crates.io.
 
 ## [0.1.0] - 2026-04-03
 
