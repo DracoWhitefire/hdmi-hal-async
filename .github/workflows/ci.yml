@@ -18,16 +18,17 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
         with:
+          toolchain: stable
           components: rustfmt, clippy
           targets: thumbv7em-none-eabi
 
       - name: Cache
-        uses: actions/cache@v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry
@@ -58,18 +59,21 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
         with:
+          toolchain: stable
           components: llvm-tools-preview
 
       - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
+        uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2.87.26
+        with:
+          tool: cargo-llvm-cov
 
       - name: Cache
-        uses: actions/cache@v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry
@@ -106,7 +110,7 @@ jobs:
 
       - name: Open PR if baseline changed
         if: github.event_name == 'push'
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: ci/coverage-ratchet
