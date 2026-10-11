@@ -47,6 +47,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+          targets: thumbv7em-none-eabi
 
       - name: Cache
         uses: actions/cache@v4
@@ -71,7 +72,7 @@ jobs:
         run: cargo test --locked
 
       - name: Build (no_std)
-        run: cargo build --locked --no-default-features
+        run: cargo build --locked --no-default-features --target thumbv7em-none-eabi
 
       # Materialise the .crate package before signing; cargo publish would
       # do this internally, but we need the file path for the attestation.

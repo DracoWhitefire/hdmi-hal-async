@@ -12,10 +12,14 @@
 // required. This follows the same decision made by embedded-hal-async.
 #![allow(async_fn_in_trait)]
 
-/// PHY lane configuration traits and associated types.
+/// PHY control trait.
 pub mod phy;
 
 /// SCDC register transport trait.
 pub mod scdc;
 
-pub use hdmi_hal::phy::{EqParams, LaneEqParams, LtpPattern};
+pub use hdmi_hal::phy::{EqParams, FrlOutput, LaneEqParams, LanePatterns, LtpPattern, TxFfeLevel};
+
+/// The FRL rate, as `HdmiPhy::set_frl_rate` takes it; re-exported so that implementations
+/// name the same type this crate does.
+pub use hdmi_hal::HdmiForumFrl;

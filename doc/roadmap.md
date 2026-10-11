@@ -16,16 +16,13 @@
 
 ## Planned
 
-### culvert-async
+Mirrored from `hdmi-hal`: each item lands there first and here in the same release, with
+the same shape. See `hdmi-hal`'s
+[`doc/roadmap.md`](https://github.com/DracoWhitefire/hdmi-hal/blob/main/doc/roadmap.md)
+for the details.
 
-An async companion to `culvert` that wraps `hdmi_hal_async::scdc::ScdcTransport` and
-provides typed SCDC register wrappers with `async fn` methods. Mirrors `culvert`'s API
-with `async fn` replacing `fn` throughout.
-
-### plumbob-async
-
-An async companion to `plumbob` that implements the four-phase FRL link training state
-machine as a cooperative async state machine. Uses `hdmi_hal_async::phy::HdmiPhy` and its
-own async `ScdcClient` trait (parallel to `plumbob::ScdcClient`). The polling loops in
-`plumbob`'s phases become cooperative `await` points rather than spin loops with a
-bounded iteration counter.
+- **Further PHY configuration** — lane mapping, TMDS pre-emphasis and swing,
+  spread-spectrum clocking and power states, each decided when the layer that needs it is
+  built. As trait methods with default implementations they are not breaking changes; as
+  required methods they would be.
+- **CEC line trait** — a single-wire CEC bus access primitive, when CEC work begins.

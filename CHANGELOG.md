@@ -7,25 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-05-23
-
 ### Breaking changes
 
+- **`LtpPattern` is now a `#[non_exhaustive]` enum with the HDMI 2.1 pattern values**,
+  following `hdmi-hal`. The re-exported type previously documented 1–4 as LFSR 0–3, which
+  was wrong: the values are 1 = all ones, 2 = all zeros, 3 = Nyquist clock, 4 = DDE
+  compliance and 5–8 = LFSR 0–3. `LtpPattern::new(u8)` is removed; use the variants
+  (`LtpPattern::Lfsr0` etc.).
+- **`HdmiPhy::send_ltp` takes the full per-lane pattern set**, mirroring `hdmi-hal`: the
+  signature is now `async fn send_ltp(&mut self, patterns: LanePatterns)`. `None` on a
+  lane means no training pattern; `None` on every lane stops the training patterns.
+- **`HdmiPhy::set_frl_output` is a new required method**, mirroring `hdmi-hal`: existing
+  implementations must add
+  `async fn set_frl_output(&mut self, output: FrlOutput) -> Result<(), Self::Error>`. It
+  selects gap-only output during link training and active output once training has
+  succeeded.
 - **`ScdcTransport::read` now takes `&self` instead of `&mut self`.** Mirrors the
   same change in `hdmi-hal`. Implementations must change `async fn read(&mut self, reg: u8)`
   to `async fn read(&self, reg: u8)` and introduce interior mutability for any state
   mutated during reads.
+- **`hdmi-hal` updated to 0.5** — the release with the per-lane `send_ltp`,
+  `set_frl_output` and the HDMI 2.1 `LtpPattern` values mirrored above. It uses
+  display-types 0.4, like this crate.
+- **`display-types` updated to 0.4** — tracks DisplayID 2.x support added in `piaf` 0.4.1.
 
 ### Added
 
+- The PHY value types (`EqParams`, `FrlOutput`, `LaneEqParams`, `LanePatterns`,
+  `LtpPattern`, `TxFfeLevel`) re-exported in `hdmi_hal_async::phy` as well, at the same
+  paths as in `hdmi-hal`'s `phy` module, so code moving between the sync and async traits
+  keeps its imports. The crate-root re-exports remain.
+- `HdmiForumFrl` re-exported at the crate root, from `hdmi-hal`.
+- `LanePatterns` re-exported from `hdmi-hal` at the crate root.
+- `FrlOutput` re-exported from `hdmi-hal` at the crate root.
+- `TxFfeLevel` re-exported from `hdmi-hal` at the crate root. `LaneEqParams` (from
+  `hdmi-hal`) now carries the lane's TxFFE level as `tx_ffe_level`, applied through
+  `HdmiPhy::adjust_equalization`.
+- `ScdcTransport::read_block(reg, buf)`, mirroring `hdmi-hal` — reads consecutive
+  registers into `buf`. The default implementation calls `read` once per byte, so existing
+  transports need no changes; transports that can burst-read should override it.
 - **SLSA Build Level 2 provenance** — release artifacts are attested via
   `actions/attest-build-provenance` and verified with
   `gh attestation verify <file> --repo DracoWhitefire/hdmi-hal-async`.
 
 ### Changed
 
-- **`hdmi-hal` updated to 0.4.1** — aligns with display-types 0.4 across the stack.
-- **`display-types` updated to 0.4** — tracks DisplayID 2.x support added in `piaf` 0.4.1.
+- `HdmiPhy`'s documentation now describes what it covers, matching `hdmi-hal`: what FRL
+  link training needs from the transmitter (rate, training patterns, output mode,
+  scrambling and each lane's TxFFE level). Further PHY configuration (lane mapping, TMDS
+  pre-emphasis and swing, spread-spectrum clocking, power states) is listed as planned in
+  the roadmap.
+- `HdmiPhy::set_frl_rate`'s documentation says it returns once the PHY transmits at the
+  rate, including any bring-up its hardware needs (such as a clock pattern held until its
+  PLL locks).
+
+### Internal
+
+- **CI builds for a `no_std` target** — the `Build (no_std)` step now builds for
+  `thumbv7em-none-eabi`. It previously built for the host, where `std` is always
+  available, so it could not catch a dependency that enables `std` (as hdmi-hal did
+  through `display-types`).
+  The publish workflow runs the same build steps.
 
 ## [0.1.0] - 2026-04-03
 
