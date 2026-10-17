@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the crate root like the other PHY types. `EqParams` carries it since hdmi-hal 0.5.1
   (`tx_ffe_restrictions`), so a PHY implementation can name the type without a direct
   `hdmi-hal` dependency. Requires hdmi-hal 0.5.1.
+- **`phy::SendHdmiPhy`, `HdmiPhy` with `Send` futures** — the same methods and contract,
+  each returning a future that is `Send`, with `type Error: Send`. Code generic over a
+  PHY can then spawn link training on a multi-threaded executor (Tokio's multi-thread
+  runtime), which `HdmiPhy`'s `async fn`s do not allow. Every `SendHdmiPhy` is an
+  `HdmiPhy` through a blanket implementation, so it also works with code written against
+  `HdmiPhy`; implementations still write `async fn`. A type implements one of the two;
+  import the one the code is bounded by (with both in scope, method calls on a
+  `SendHdmiPhy` type are ambiguous).
 
 ## [0.2.0] - 2026-10-11
 
