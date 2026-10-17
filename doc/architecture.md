@@ -10,8 +10,12 @@ in `hdmi-hal`:
 - `phy::HdmiPhy` — what FRL link training needs from the transmitter PHY: FRL rate, link
   training patterns, FRL output mode, scrambling and each lane's TxFFE level
 
+and a `Send` twin of each, `scdc::SendScdcTransport` and `phy::SendHdmiPhy`, for code that
+spawns on a multi-threaded executor (see "`Send` futures: the twins" below).
+
 Data types (`LtpPattern`, `LanePatterns`, `FrlOutput`, `EqParams`, `LaneEqParams`,
-`TxFfeLevel`) are defined in `hdmi-hal` and re-exported here; they are not duplicated.
+`TxFfeLevel`, `TxFfeRestrictions`) are defined in `hdmi-hal` and re-exported here; they
+are not duplicated.
 
 The crate is traits-only. No implementations live here.
 
@@ -25,14 +29,62 @@ MSRV is `1.85`, which is well above the `1.75` stabilisation of `async fn` in tr
 AFIT-generated futures are not object-safe, which is the same trade-off `embedded-hal-async`
 accepts. Trait objects are not a goal for this HAL layer.
 
-Nor do the traits promise that their futures are `Send`. With concrete types the compiler
-sees the real futures, so a training future over `Send` implementations is `Send` and can
-be spawned on a multi-threaded executor. Code generic over `HdmiPhy` or `ScdcTransport`
-cannot spawn one, however the types are bounded; it runs on a single-threaded executor
-(Embassy, Tokio's current-thread runtime or `LocalSet`) or uses concrete types. Because
-`ScdcTransport::read` takes `&self`, a future that reads also needs the transport to be
-`Sync` to be `Send`. `Send` variants of the traits are designed and proven in
-the stack design document ("Sync and Async Companions", "`Send` futures for multi-threaded executors"), and deferred until a consumer needs them.
+Nor do the plain traits promise that their futures are `Send`. With concrete types the
+compiler sees the real futures, so a training future over `Send` implementations is `Send`
+and can be spawned on a multi-threaded executor. Code generic over `HdmiPhy` or
+`ScdcTransport` cannot spawn one, however the types are bounded; it runs on a
+single-threaded executor (Embassy, Tokio's current-thread runtime or `LocalSet`), uses
+concrete types, or is bounded by the `Send` twins below.
+
+---
+
+## `Send` futures: the twins
+
+`phy::SendHdmiPhy` and `scdc::SendScdcTransport` (from 0.2.1) have the same methods and
+contract as the plain traits, each returning a future that is `Send`. This is the pattern
+`trait_variant` generates, written by hand (no dependency):
+
+```rust
+pub trait SendHdmiPhy: Send {
+    type Error: Send;
+    fn set_frl_rate(&mut self, rate: HdmiForumFrl)
+        -> impl Future<Output = Result<(), Self::Error>> + Send;
+    // … one per method
+}
+
+impl<T: SendHdmiPhy> HdmiPhy for T {
+    type Error = <T as SendHdmiPhy>::Error;
+    fn set_frl_rate(&mut self, rate: HdmiForumFrl)
+        -> impl Future<Output = Result<(), Self::Error>> {
+        <T as SendHdmiPhy>::set_frl_rate(self, rate)
+    }
+    // …
+}
+```
+
+- **Implementations write `async fn`**; the compiler checks that each future is `Send`.
+- **`type Error: Send`**, unlike `trait_variant`: every user of a twin spawns, and a
+  spawned task returns the errors, so the bound would otherwise be repeated by every
+  caller (`P::Error: Send`).
+- **`SendScdcTransport: Send + Sync`**: `read` takes `&self`, and a future holding `&self`
+  is only `Send` when the transport is `Sync`. Interior state for reads therefore needs a
+  `Sync` type (an atomic or a lock, not a `Cell`).
+- **`read_block`**: the twin has its own default (one `read` per byte, a `Send` future), and
+  the blanket implementation forwards `read_block` as well, so an override is used through
+  either trait.
+- **Blanket implementations**: every twin implementation is a plain-trait implementation
+  too, so it works with code written against `HdmiPhy` or `ScdcTransport`. A type
+  implements one of the two; implementing both conflicts with the blanket implementation
+  (E0119). Existing implementations of the plain traits are unaffected.
+- **Method calls**: a twin implementation has both traits' methods, so with both traits in
+  scope a call on it is ambiguous (E0034). Import the trait the code is bounded by, or use
+  the qualified form (`SendHdmiPhy::set_frl_rate(&mut phy, rate)`).
+
+Return-type notation (`P: HdmiPhy<set_frl_rate(..): Send>`) would let callers ask for
+`Send` futures of the plain traits without a second set of traits. It is not stable (rustc
+1.99, October 2026); when it is, the twins are weighed against it. The tests show both
+directions: a twin implementation used through the plain trait, and a function generic
+over a twin whose future must be `Send` (it does not compile with the plain trait).
 
 ---
 
@@ -44,9 +96,9 @@ The module tree mirrors `hdmi-hal` exactly:
 src/
   lib.rs          — #![no_std], module declarations, crate-level docs
   scdc/
-    mod.rs        — async ScdcTransport trait
+    mod.rs        — async ScdcTransport trait and its Send twin, SendScdcTransport
   phy/
-    mod.rs        — async HdmiPhy trait
+    mod.rs        — async HdmiPhy trait and its Send twin, SendHdmiPhy
 ```
 
 ---
@@ -109,9 +161,13 @@ callers need no direct `hdmi-hal` dependency. They are available at two paths, a
 
 ```rust
 // src/phy/mod.rs: the same paths as `hdmi_hal::phy::*`
-pub use hdmi_hal::phy::{EqParams, FrlOutput, LaneEqParams, LanePatterns, LtpPattern, TxFfeLevel};
+pub use hdmi_hal::phy::{
+    EqParams, FrlOutput, LaneEqParams, LanePatterns, LtpPattern, TxFfeLevel, TxFfeRestrictions,
+};
 // src/lib.rs
-pub use hdmi_hal::phy::{EqParams, FrlOutput, LaneEqParams, LanePatterns, LtpPattern, TxFfeLevel};
+pub use hdmi_hal::phy::{
+    EqParams, FrlOutput, LaneEqParams, LanePatterns, LtpPattern, TxFfeLevel, TxFfeRestrictions,
+};
 ```
 
 Code moving between the sync and async traits can keep its `phy::` imports.

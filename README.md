@@ -22,9 +22,8 @@ executor dependency on each other or their consumers.
 
 ## Usage
 
-```toml
-[dependencies]
-hdmi-hal-async = "0.1"
+```sh
+cargo add hdmi-hal-async
 ```
 
 Implement a trait against your async hardware backend:
@@ -52,6 +51,33 @@ async fn configure_frl<T: ScdcTransport>(transport: &mut T) -> Result<(), T::Err
     Ok(())
 }
 ```
+
+### Multi-threaded executors
+
+The plain traits promise nothing about their futures, so code generic over them cannot
+spawn on a multi-threaded executor. For that, each trait has a `Send` twin,
+`phy::SendHdmiPhy` and `scdc::SendScdcTransport`: the same methods, returning futures
+that are `Send`, with errors that are `Send`. A transport twin is also `Sync`, because
+`read` takes `&self`.
+
+```rust
+use hdmi_hal_async::scdc::SendScdcTransport;
+
+impl SendScdcTransport for MyThreadSafeBackend {
+    type Error = MyError;
+
+    async fn read(&self, reg: u8) -> Result<u8, MyError> { /* ... */ }
+    async fn write(&mut self, reg: u8, value: u8) -> Result<(), MyError> { /* ... */ }
+}
+
+fn spawn_frl_start<T: SendScdcTransport + 'static>(mut transport: T) {
+    tokio::spawn(async move { transport.write(0x31, 0x01).await });
+}
+```
+
+A twin implementation is also an implementation of the plain trait, so it works with
+code written against either. Import the trait your code is bounded by: with both in
+scope, method calls on a twin implementation are ambiguous.
 
 ## Stack position
 

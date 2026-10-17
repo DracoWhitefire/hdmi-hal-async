@@ -1,7 +1,9 @@
 use display_types::cea861::hdmi_forum::HdmiForumFrl;
 /// The PHY value types, at the paths `hdmi-hal` gives them (`hdmi_hal::phy::*`). They are
 /// re-exported at the crate root as well.
-pub use hdmi_hal::phy::{EqParams, FrlOutput, LaneEqParams, LanePatterns, LtpPattern, TxFfeLevel};
+pub use hdmi_hal::phy::{
+    EqParams, FrlOutput, LaneEqParams, LanePatterns, LtpPattern, TxFfeLevel, TxFfeRestrictions,
+};
 
 /// Async link-level control of an HDMI 2.1 transmitter PHY.
 ///
@@ -39,6 +41,92 @@ pub trait HdmiPhy {
 
     /// Enable or disable scrambling on the PHY.
     async fn set_scrambling(&mut self, enabled: bool) -> Result<(), Self::Error>;
+}
+
+/// [`HdmiPhy`] with `Send` futures, for code that spawns link training on a multi-threaded
+/// executor.
+///
+/// `HdmiPhy`'s `async fn`s promise nothing about their futures, so code generic over
+/// `P: HdmiPhy` cannot spawn a future that calls them, however `P` is bounded. This trait
+/// has the same methods and contract, each returning a future that is `Send`, and errors
+/// that are `Send` too: a spawned task returns them. Implementations still write
+/// `async fn`; the compiler checks that each future is `Send`.
+///
+/// Every `SendHdmiPhy` is an `HdmiPhy`, through a blanket implementation, so it works
+/// with everything written against `HdmiPhy` as well; a type implements one of the two
+/// (implementing both conflicts with the blanket implementation). A `SendHdmiPhy` type
+/// has both traits' methods, so with both traits in scope a method call on it is
+/// ambiguous: import only the trait the code is bounded by, or call
+/// `SendHdmiPhy::set_frl_rate(…)`.
+pub trait SendHdmiPhy: Send {
+    /// Error type returned by PHY operations.
+    type Error: Send;
+
+    /// See [`HdmiPhy::set_frl_rate`].
+    fn set_frl_rate(
+        &mut self,
+        rate: HdmiForumFrl,
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send;
+
+    /// See [`HdmiPhy::send_ltp`].
+    fn send_ltp(
+        &mut self,
+        patterns: LanePatterns,
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send;
+
+    /// See [`HdmiPhy::set_frl_output`].
+    fn set_frl_output(
+        &mut self,
+        output: FrlOutput,
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send;
+
+    /// See [`HdmiPhy::adjust_equalization`].
+    fn adjust_equalization(
+        &mut self,
+        params: EqParams,
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send;
+
+    /// See [`HdmiPhy::set_scrambling`].
+    fn set_scrambling(
+        &mut self,
+        enabled: bool,
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send;
+}
+
+impl<T: SendHdmiPhy> HdmiPhy for T {
+    type Error = <T as SendHdmiPhy>::Error;
+
+    fn set_frl_rate(
+        &mut self,
+        rate: HdmiForumFrl,
+    ) -> impl Future<Output = Result<(), Self::Error>> {
+        <T as SendHdmiPhy>::set_frl_rate(self, rate)
+    }
+
+    fn send_ltp(
+        &mut self,
+        patterns: LanePatterns,
+    ) -> impl Future<Output = Result<(), Self::Error>> {
+        <T as SendHdmiPhy>::send_ltp(self, patterns)
+    }
+
+    fn set_frl_output(
+        &mut self,
+        output: FrlOutput,
+    ) -> impl Future<Output = Result<(), Self::Error>> {
+        <T as SendHdmiPhy>::set_frl_output(self, output)
+    }
+
+    fn adjust_equalization(
+        &mut self,
+        params: EqParams,
+    ) -> impl Future<Output = Result<(), Self::Error>> {
+        <T as SendHdmiPhy>::adjust_equalization(self, params)
+    }
+
+    fn set_scrambling(&mut self, enabled: bool) -> impl Future<Output = Result<(), Self::Error>> {
+        <T as SendHdmiPhy>::set_scrambling(self, enabled)
+    }
 }
 
 #[cfg(test)]
@@ -215,6 +303,113 @@ mod tests {
         assert_eq!(phy.eq_calls, 2);
     }
 
+    /// Implements only the `Send` twin; it records the calls in order.
+    #[derive(Default)]
+    struct SendMockPhy {
+        calls: [Option<&'static str>; 5],
+        n: usize,
+        last_eq: Option<EqParams>,
+    }
+
+    impl SendMockPhy {
+        fn record(&mut self, call: &'static str) {
+            self.calls[self.n] = Some(call);
+            self.n += 1;
+        }
+    }
+
+    impl SendHdmiPhy for SendMockPhy {
+        type Error = core::convert::Infallible;
+
+        async fn set_frl_rate(&mut self, _rate: HdmiForumFrl) -> Result<(), Self::Error> {
+            self.record("set_frl_rate");
+            Ok(())
+        }
+
+        async fn send_ltp(&mut self, _patterns: LanePatterns) -> Result<(), Self::Error> {
+            self.record("send_ltp");
+            Ok(())
+        }
+
+        async fn set_frl_output(&mut self, _output: FrlOutput) -> Result<(), Self::Error> {
+            self.record("set_frl_output");
+            Ok(())
+        }
+
+        async fn adjust_equalization(&mut self, params: EqParams) -> Result<(), Self::Error> {
+            self.record("adjust_equalization");
+            self.last_eq = Some(params);
+            Ok(())
+        }
+
+        async fn set_scrambling(&mut self, _enabled: bool) -> Result<(), Self::Error> {
+            self.record("set_scrambling");
+            Ok(())
+        }
+    }
+
+    /// The result of each method call, in call order.
+    type Results<E> = [Result<(), E>; 5];
+
+    /// Calls every method through `HdmiPhy`, as code written against the plain trait does.
+    async fn drive_plain<P: HdmiPhy>(phy: &mut P, eq: EqParams) -> Results<P::Error> {
+        [
+            phy.set_frl_rate(HdmiForumFrl::Rate6Gbps4Lanes).await,
+            phy.send_ltp(LanePatterns::default()).await,
+            phy.set_frl_output(FrlOutput::GapOnly).await,
+            phy.adjust_equalization(eq).await,
+            phy.set_scrambling(true).await,
+        ]
+    }
+
+    /// Calls every method through `SendHdmiPhy`, as code bounded by the twin does.
+    async fn drive_send<P: SendHdmiPhy>(phy: &mut P) -> Results<P::Error> {
+        [
+            SendHdmiPhy::set_frl_rate(phy, HdmiForumFrl::Rate12Gbps4Lanes).await,
+            SendHdmiPhy::send_ltp(phy, LanePatterns::default()).await,
+            SendHdmiPhy::set_frl_output(phy, FrlOutput::Active).await,
+            SendHdmiPhy::adjust_equalization(phy, EqParams::new()).await,
+            SendHdmiPhy::set_scrambling(phy, false).await,
+        ]
+    }
+
+    /// The compiler proves this `Send` bound for every `P: SendHdmiPhy`, not only for the
+    /// mock; with `HdmiPhy` in its place it would not compile.
+    fn spawnable<P: SendHdmiPhy>(
+        phy: &mut P,
+    ) -> impl Future<Output = Results<P::Error>> + Send + '_ {
+        drive_send(phy)
+    }
+
+    fn assert_send<T: Send>(value: T) -> T {
+        value
+    }
+
+    const ALL_CALLS: [Option<&str>; 5] = [
+        Some("set_frl_rate"),
+        Some("send_ltp"),
+        Some("set_frl_output"),
+        Some("adjust_equalization"),
+        Some("set_scrambling"),
+    ];
+
+    #[pollster::test]
+    async fn send_twin_is_usable_as_hdmi_phy() {
+        let mut phy = SendMockPhy::default();
+        let mut eq = EqParams::new();
+        eq.lane2.tx_ffe_level = TxFfeLevel::MAX;
+        assert_eq!(drive_plain(&mut phy, eq).await, [Ok(()); 5]);
+        assert_eq!(phy.calls, ALL_CALLS);
+        assert_eq!(phy.last_eq, Some(eq));
+    }
+
+    #[pollster::test]
+    async fn send_twin_futures_are_send_in_generic_code() {
+        let mut phy = SendMockPhy::default();
+        assert_eq!(assert_send(spawnable(&mut phy)).await, [Ok(()); 5]);
+        assert_eq!(phy.calls, ALL_CALLS);
+    }
+
     #[test]
     fn value_types_are_hdmi_hals_at_both_paths() {
         // `phy::` mirrors `hdmi_hal::phy::`; the crate root has the same types.
@@ -227,5 +422,8 @@ mod tests {
         let _: crate::phy::LanePatterns = crate::LanePatterns::default();
         let _: crate::phy::EqParams = crate::EqParams::default();
         let _: crate::phy::LaneEqParams = crate::LaneEqParams::default();
+        let restrictions: crate::phy::TxFfeRestrictions =
+            hdmi_hal::phy::TxFfeRestrictions::default();
+        let _: crate::TxFfeRestrictions = restrictions;
     }
 }
