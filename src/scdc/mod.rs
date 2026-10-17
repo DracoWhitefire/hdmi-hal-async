@@ -58,6 +58,10 @@ pub trait ScdcTransport {
 /// the blanket implementation). A `SendScdcTransport` type has both traits' methods, so
 /// with both traits in scope a method call on it is ambiguous: import only the trait the
 /// code is bounded by, or call `SendScdcTransport::read(…)`.
+///
+/// Bound generic code by `SendScdcTransport` alone. Adding `+ ScdcTransport`, which it
+/// implies anyway, makes the compiler use that bound instead of the blanket
+/// implementation, and the futures are no longer known to be `Send`.
 pub trait SendScdcTransport: Send + Sync {
     /// Error type returned by transport operations.
     type Error: Send;
