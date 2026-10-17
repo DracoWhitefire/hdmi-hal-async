@@ -11,7 +11,7 @@ in `hdmi-hal`:
   training patterns, FRL output mode, scrambling and each lane's TxFFE level
 
 Data types (`LtpPattern`, `LanePatterns`, `FrlOutput`, `EqParams`, `LaneEqParams`,
-`TxFfeLevel`) are defined in `hdmi-hal` and re-exported here; they are not duplicated.
+`TxFfeLevel`, `TxFfeRestrictions`) are defined in `hdmi-hal` and re-exported here; they are not duplicated.
 
 The crate is traits-only. No implementations live here.
 
@@ -109,9 +109,13 @@ callers need no direct `hdmi-hal` dependency. They are available at two paths, a
 
 ```rust
 // src/phy/mod.rs: the same paths as `hdmi_hal::phy::*`
-pub use hdmi_hal::phy::{EqParams, FrlOutput, LaneEqParams, LanePatterns, LtpPattern, TxFfeLevel};
+pub use hdmi_hal::phy::{
+    EqParams, FrlOutput, LaneEqParams, LanePatterns, LtpPattern, TxFfeLevel, TxFfeRestrictions,
+};
 // src/lib.rs
-pub use hdmi_hal::phy::{EqParams, FrlOutput, LaneEqParams, LanePatterns, LtpPattern, TxFfeLevel};
+pub use hdmi_hal::phy::{
+    EqParams, FrlOutput, LaneEqParams, LanePatterns, LtpPattern, TxFfeLevel, TxFfeRestrictions,
+};
 ```
 
 Code moving between the sync and async traits can keep its `phy::` imports.

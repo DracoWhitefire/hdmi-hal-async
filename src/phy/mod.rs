@@ -1,7 +1,9 @@
 use display_types::cea861::hdmi_forum::HdmiForumFrl;
 /// The PHY value types, at the paths `hdmi-hal` gives them (`hdmi_hal::phy::*`). They are
 /// re-exported at the crate root as well.
-pub use hdmi_hal::phy::{EqParams, FrlOutput, LaneEqParams, LanePatterns, LtpPattern, TxFfeLevel};
+pub use hdmi_hal::phy::{
+    EqParams, FrlOutput, LaneEqParams, LanePatterns, LtpPattern, TxFfeLevel, TxFfeRestrictions,
+};
 
 /// Async link-level control of an HDMI 2.1 transmitter PHY.
 ///
@@ -227,5 +229,8 @@ mod tests {
         let _: crate::phy::LanePatterns = crate::LanePatterns::default();
         let _: crate::phy::EqParams = crate::EqParams::default();
         let _: crate::phy::LaneEqParams = crate::LaneEqParams::default();
+        let restrictions: crate::phy::TxFfeRestrictions =
+            hdmi_hal::phy::TxFfeRestrictions::default();
+        let _: crate::TxFfeRestrictions = restrictions;
     }
 }

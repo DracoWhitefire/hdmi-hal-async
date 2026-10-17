@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`TxFfeRestrictions` re-exported** from `hdmi-hal`, in `hdmi_hal_async::phy` and at
+  the crate root like the other PHY types. `EqParams` carries it since hdmi-hal 0.5.1
+  (`tx_ffe_restrictions`), so a PHY implementation can name the type without a direct
+  `hdmi-hal` dependency. Requires hdmi-hal 0.5.1.
+
 ## [0.2.0] - 2026-10-11
 
 ### Breaking changes

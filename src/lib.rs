@@ -18,7 +18,9 @@ pub mod phy;
 /// SCDC register transport trait.
 pub mod scdc;
 
-pub use hdmi_hal::phy::{EqParams, FrlOutput, LaneEqParams, LanePatterns, LtpPattern, TxFfeLevel};
+pub use hdmi_hal::phy::{
+    EqParams, FrlOutput, LaneEqParams, LanePatterns, LtpPattern, TxFfeLevel, TxFfeRestrictions,
+};
 
 /// The FRL rate, as `HdmiPhy::set_frl_rate` takes it; re-exported so that implementations
 /// name the same type this crate does.
