@@ -10,9 +10,9 @@ checksum = "843867be96c8daad0d758b57df9392b6d8d271134fce549de6ce169ff98a92af"
 
 [[package]]
 name = "display-types"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "864f57c45551067333f550d0adeba6f52196657856d131cf5d8e4ce7df696a4d"
+checksum = "d55798f52f556c3d0a8345ac33d44420bcadea3a2b93154248458f384fdddd78"
 dependencies = [
  "bitflags",
 ]
