@@ -21,6 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `HdmiPhy`; implementations still write `async fn`. A type implements one of the two;
   import the one the code is bounded by (with both in scope, method calls on a
   `SendHdmiPhy` type are ambiguous).
+- **`scdc::SendScdcTransport`, `ScdcTransport` with `Send` futures** — the same for the
+  SCDC transport, with `type Error: Send` and its own default `read_block` (one `read`
+  per byte, a `Send` future). The trait requires `Send + Sync`: `read` takes `&self`, and
+  a future holding `&self` is only `Send` when the transport is `Sync`. The blanket
+  `ScdcTransport` implementation forwards `read_block` too, so a transport's block-read
+  override is used by code written against either trait.
 
 ## [0.2.0] - 2026-10-11
 
