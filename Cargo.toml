@@ -11,7 +11,7 @@ keywords = ["hdmi", "hal", "embedded", "async", "no-std"]
 categories = ["embedded", "hardware-support", "no-std", "asynchronous"]
 
 [dependencies]
-hdmi-hal = { version = "0.5", default-features = false }
+hdmi-hal = { version = "0.5.1", default-features = false }
 display-types = { version = "0.4", default-features = false }
 
 [dev-dependencies]
