@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The `Send` twins' documentation says to bound generic code by the twin alone.** An
+  added `+ HdmiPhy` or `+ ScdcTransport` bound, which the twins imply anyway, makes the
+  compiler use it instead of the blanket implementation, so the futures are no longer
+  known to be `Send`. `SendHdmiPhy`, `SendScdcTransport`, the README and architecture.md
+  say so.
+
 ## [0.2.1] - 2026-10-17
 
 ### Added

@@ -77,7 +77,10 @@ fn spawn_frl_start<T: SendScdcTransport + 'static>(mut transport: T) {
 
 A twin implementation is also an implementation of the plain trait, so it works with
 code written against either. Import the trait your code is bounded by: with both in
-scope, method calls on a twin implementation are ambiguous.
+scope, method calls on a twin implementation are ambiguous. Bound generic code by the twin
+alone, as above: adding `+ ScdcTransport` or `+ HdmiPhy`, which the twins imply anyway,
+makes the compiler use that bound instead of the blanket implementation, and the futures
+are no longer known to be `Send`.
 
 ## Stack position
 

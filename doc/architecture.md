@@ -79,6 +79,10 @@ impl<T: SendHdmiPhy> HdmiPhy for T {
 - **Method calls**: a twin implementation has both traits' methods, so with both traits in
   scope a call on it is ambiguous (E0034). Import the trait the code is bounded by, or use
   the qualified form (`SendHdmiPhy::set_frl_rate(&mut phy, rate)`).
+- **Bounds**: generic code is bounded by the twin alone. With `P: SendHdmiPhy + HdmiPhy`
+  the compiler uses the explicit `HdmiPhy` bound rather than the blanket implementation,
+  so the futures are opaque again and not known to be `Send` ("future cannot be sent
+  between threads safely" on spawning); likewise `+ ScdcTransport`.
 
 Return-type notation (`P: HdmiPhy<set_frl_rate(..): Send>`) would let callers ask for
 `Send` futures of the plain traits without a second set of traits. It is not stable (rustc
