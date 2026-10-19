@@ -7,8 +7,9 @@ readme = "README.md"
 license = "MPL-2.0"
 description = "Async hardware abstraction traits for the HDMI stack"
 repository = "https://github.com/DracoWhitefire/hdmi-hal-async"
-keywords = ["hdmi", "hal", "embedded", "async", "no-std"]
-categories = ["embedded", "hardware-support", "no-std", "asynchronous"]
+homepage = "https://ashlar-display.org"
+keywords = ["ashlar", "hdmi", "no-std", "hal", "async"]
+categories = ["embedded", "hardware-support", "no-std", "no-std::no-alloc", "asynchronous"]
 
 [dependencies]
 hdmi-hal = { version = "0.5.1", default-features = false }
