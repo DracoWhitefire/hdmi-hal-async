@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking changes
+
+- **`read_block` is a required method** of `ScdcTransport` and `SendScdcTransport`, as in
+  hdmi-hal. The default implementations (one `read` per byte) are gone: a transport whose
+  author never considered block reads would read related registers, such as the CED
+  counters, one at a time and could return values torn by a sink update, with nothing to
+  show for it. A transport that reads several registers in one DDC transaction implements
+  `read_block` with it; one that cannot adds `async fn read_block(&self, reg: u8, buf: &mut
+  [u8]) -> Result<(), Self::Error> { read_block_bytewise(self, reg, buf).await }`, which
+  behaves as the old default did, for either trait.
+
+### Added
+
+- **`scdc::read_block_bytewise(transport, reg, buf)`** — `read_block` as one `read` per
+  byte, for transports that cannot burst-read; the documented exception to the "one
+  transaction" rule. Generic over `T: ScdcTransport + ?Sized`; a `SendScdcTransport` uses
+  it too, and its future stays `Send`.
+- **`read_block`'s contract** is spelled out, mirroring hdmi-hal: one DDC transaction or an
+  error, never split; no consistent snapshot promised; an optional, documented maximum
+  length; an empty buffer is `Ok` with no bus activity; on error the buffer is
+  unspecified; a read past `0xFF` is unspecified.
+- **Cancellation** in `ScdcTransport`'s documentation: after a dropped read the buffer is
+  unspecified, after a dropped write it may or may not have reached the sink; an
+  implementation should leave the transport usable, and one that cannot documents what a
+  cancelled call leaves behind and how to recover. To stop early, check a deadline before
+  each call rather than dropping one in flight. `doc/architecture.md` records why it is
+  "should" (a survey of async I²C drivers' behaviour on a dropped transfer).
+
 ### Changed
 
 - **Part of Ashlar** — the README now opens with a block naming the

@@ -10,6 +10,58 @@
 /// The trait operates at the raw register level: a one-byte address and a one-byte
 /// value. Typed register wrappers, named constants, and multi-register sequences belong
 /// in the protocol crate, not here.
+///
+/// Every method is required. A transport that can read several registers in one DDC/I²C
+/// transaction implements [`read_block`](Self::read_block) with that transaction; one
+/// that cannot implements it with [`read_block_bytewise`], so the choice is visible in its
+/// code:
+///
+/// ```
+/// use core::convert::Infallible;
+/// use hdmi_hal_async::scdc::{ScdcTransport, read_block_bytewise};
+///
+/// struct SimulatedScdc {
+///     registers: [u8; 256],
+/// }
+///
+/// impl ScdcTransport for SimulatedScdc {
+///     type Error = Infallible;
+///
+///     async fn read(&self, reg: u8) -> Result<u8, Infallible> {
+///         Ok(self.registers[reg as usize])
+///     }
+///
+///     async fn write(&mut self, reg: u8, value: u8) -> Result<(), Infallible> {
+///         self.registers[reg as usize] = value;
+///         Ok(())
+///     }
+///
+///     /// One register at a time: not one transaction.
+///     async fn read_block(&self, reg: u8, buf: &mut [u8]) -> Result<(), Infallible> {
+///         read_block_bytewise(self, reg, buf).await
+///     }
+/// }
+/// ```
+///
+/// # Cancellation
+///
+/// Any of these futures may be dropped before it completes, for example by a
+/// deadline in the caller. What a dropped call has done is then unknown:
+///
+/// - after a dropped [`read`](Self::read) or [`read_block`](Self::read_block), the
+///   buffer's contents are unspecified;
+/// - after a dropped [`write`](Self::write), the write may or may not have reached the
+///   sink, so a caller that needs to know reads the register back.
+///
+/// An implementation should leave the transport usable for the next call, recovering
+/// the bus itself if the transfer was cut short (for example by clearing a held bus
+/// before the next transaction). One that cannot must say so in its documentation: what
+/// a cancelled call leaves behind, and how to recover (for example, by constructing the
+/// transport again).
+///
+/// A caller that needs to stop early can avoid the question: check the deadline or cancel
+/// signal before each call and stop there, rather than dropping a future mid-flight. No
+/// transaction is then cut short, whatever the transport does.
 pub trait ScdcTransport {
     /// Error type returned by transport operations.
     type Error;
@@ -22,20 +74,56 @@ pub trait ScdcTransport {
 
     /// Read consecutive SCDC registers, starting at `reg`, into `buf`.
     ///
-    /// The default implementation calls [`read`](Self::read) once per byte, stopping at
-    /// the first error. Transports that can read several bytes in one DDC/I²C
-    /// transaction should override it, so that related registers (such as the status
-    /// flags or the character error counters) are read together rather than one at a
-    /// time while the sink may be updating them. A read past register `0xFF` is not
-    /// meaningful; the default implementation wraps the address to `0x00`.
-    async fn read_block(&self, reg: u8, buf: &mut [u8]) -> Result<(), Self::Error> {
-        let mut addr = reg;
-        for byte in buf {
-            *byte = self.read(addr).await?;
-            addr = addr.wrapping_add(1);
-        }
-        Ok(())
+    /// Related registers, such as the status flags or the character error counters, are
+    /// read together so that a value the sink updates between two of them cannot be
+    /// read half before and half after the update. The contract:
+    ///
+    /// - **What it reads.** `buf[i]` is register `reg + i`.
+    /// - **One transaction.** The whole buffer is read in one DDC transaction (the
+    ///   register offset written, a repeated START, `buf.len()` bytes read, STOP), or an
+    ///   error is returned. An implementation never splits the read into several
+    ///   transactions, and never falls back to one register at a time. Calls made at the
+    ///   same time through shared references do not interleave on the bus.
+    ///   [`read_block_bytewise`] is the one exception to both, and a transport that uses
+    ///   it says so.
+    /// - **No snapshot promised.** One transaction does not mean the sink returns a
+    ///   consistent snapshot: whether it holds its registers still during a read is up to
+    ///   the sink.
+    /// - **Length limit.** An implementation may have a maximum length, if it documents
+    ///   it; a longer buffer is an error, not split. A caller that needs a longer read
+    ///   splits it itself, knowing the parts are separate transactions.
+    /// - **Empty buffer.** `Ok`, with no bus activity.
+    /// - **On error,** the contents of `buf` are unspecified.
+    /// - **Past `0xFF`.** The caller does not read past register `0xFF`. If it does, the
+    ///   result is unspecified: [`read_block_bytewise`] wraps to `0x00`, a real burst
+    ///   read leaves it to the sink.
+    async fn read_block(&self, reg: u8, buf: &mut [u8]) -> Result<(), Self::Error>;
+}
+
+/// Implements [`ScdcTransport::read_block`] with one [`read`](ScdcTransport::read) per
+/// byte, for a transport that cannot read several registers in one transaction.
+///
+/// This is the documented exception to `read_block`'s "one transaction" rule: each byte
+/// is its own transaction, so a value the sink updates between two of them can be read
+/// half before and half after the update, and another caller's transaction can land in
+/// between. A transport that uses it should say so in its documentation.
+///
+/// Reads stop at the first error, which is returned. An empty buffer reads nothing. A
+/// read past register `0xFF` wraps to `0x00`.
+///
+/// A [`SendScdcTransport`] uses it too: through the blanket implementation, the
+/// transport is an `ScdcTransport`, and the returned future is `Send`.
+pub async fn read_block_bytewise<T: ScdcTransport + ?Sized>(
+    transport: &T,
+    reg: u8,
+    buf: &mut [u8],
+) -> Result<(), T::Error> {
+    let mut addr = reg;
+    for byte in buf {
+        *byte = transport.read(addr).await?;
+        addr = addr.wrapping_add(1);
     }
+    Ok(())
 }
 
 /// [`ScdcTransport`] with `Send` futures, for code that spawns link training on a
@@ -53,8 +141,8 @@ pub trait ScdcTransport {
 /// `Cell`).
 ///
 /// Every `SendScdcTransport` is an `ScdcTransport`, through a blanket implementation, so
-/// it works with everything written against `ScdcTransport` as well (a `read_block`
-/// override included); a type implements one of the two (implementing both conflicts with
+/// it works with everything written against `ScdcTransport` as well (its `read_block`
+/// included); a type implements one of the two (implementing both conflicts with
 /// the blanket implementation). A `SendScdcTransport` type has both traits' methods, so
 /// with both traits in scope a method call on it is ambiguous: import only the trait the
 /// code is bounded by, or call `SendScdcTransport::read(…)`.
@@ -73,22 +161,26 @@ pub trait SendScdcTransport: Send + Sync {
     fn write(&mut self, reg: u8, value: u8)
     -> impl Future<Output = Result<(), Self::Error>> + Send;
 
-    /// See [`ScdcTransport::read_block`]; the default implementation is the same, one
-    /// [`read`](Self::read) per byte.
+    /// See [`ScdcTransport::read_block`], whose contract it has. A transport that cannot
+    /// burst-read implements it with [`read_block_bytewise`]:
+    ///
+    /// ```
+    /// use hdmi_hal_async::scdc::{SendScdcTransport, read_block_bytewise};
+    /// # struct Backend;
+    /// # impl SendScdcTransport for Backend {
+    /// #     type Error = ();
+    /// #     async fn read(&self, _reg: u8) -> Result<u8, ()> { Ok(0) }
+    /// #     async fn write(&mut self, _reg: u8, _value: u8) -> Result<(), ()> { Ok(()) }
+    /// async fn read_block(&self, reg: u8, buf: &mut [u8]) -> Result<(), ()> {
+    ///     read_block_bytewise(self, reg, buf).await
+    /// }
+    /// # }
+    /// ```
     fn read_block(
         &self,
         reg: u8,
         buf: &mut [u8],
-    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
-        async move {
-            let mut addr = reg;
-            for byte in buf {
-                *byte = self.read(addr).await?;
-                addr = addr.wrapping_add(1);
-            }
-            Ok(())
-        }
-    }
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
 impl<T: SendScdcTransport> ScdcTransport for T {
@@ -152,6 +244,10 @@ mod tests {
         async fn write(&mut self, reg: u8, value: u8) -> Result<(), Self::Error> {
             self.registers[reg as usize] = value;
             Ok(())
+        }
+
+        async fn read_block(&self, reg: u8, buf: &mut [u8]) -> Result<(), Self::Error> {
+            read_block_bytewise(self, reg, buf).await
         }
     }
 
@@ -227,8 +323,8 @@ mod tests {
         assert_eq!(buf, [0xAB]);
     }
 
-    /// Implements only the `Send` twin, with the default `read_block`. Counts reads in an
-    /// atomic, since the twin needs `Sync`.
+    /// Implements only the `Send` twin, with `read_block` through `read_block_bytewise`.
+    /// Counts reads in an atomic, since the twin needs `Sync`.
     struct SendMockTransport {
         registers: [u8; 256],
         reads: AtomicU32,
@@ -268,9 +364,34 @@ mod tests {
             self.registers[reg as usize] = value;
             Ok(())
         }
+
+        async fn read_block(&self, reg: u8, buf: &mut [u8]) -> Result<(), Self::Error> {
+            read_block_bytewise(self, reg, buf).await
+        }
     }
 
-    /// Implements only the `Send` twin and overrides `read_block`, as a transport that
+    /// A `Send` twin generic over another, with `read_block` through `read_block_bytewise`:
+    /// it compiles only if the helper's future is `Send` for every `T: SendScdcTransport`,
+    /// not only for a concrete type.
+    struct Forwarding<T>(T);
+
+    impl<T: SendScdcTransport> SendScdcTransport for Forwarding<T> {
+        type Error = T::Error;
+
+        async fn read(&self, reg: u8) -> Result<u8, Self::Error> {
+            SendScdcTransport::read(&self.0, reg).await
+        }
+
+        async fn write(&mut self, reg: u8, value: u8) -> Result<(), Self::Error> {
+            SendScdcTransport::write(&mut self.0, reg, value).await
+        }
+
+        async fn read_block(&self, reg: u8, buf: &mut [u8]) -> Result<(), Self::Error> {
+            read_block_bytewise(self, reg, buf).await
+        }
+    }
+
+    /// Implements only the `Send` twin with its own `read_block`, as a transport that
     /// reads a block in one transaction does.
     struct BlockReadingTransport;
 
@@ -336,6 +457,44 @@ mod tests {
         let mut buf = [0u8; 3];
         assert_send(spawnable(&t, &mut buf)).await.unwrap();
         assert_eq!(buf, [0x40, 0x41, 0x42]);
+    }
+
+    #[pollster::test]
+    async fn bytewise_through_a_generic_send_twin() {
+        let mut t = Forwarding(SendMockTransport::filled());
+        let mut buf = [0u8; 2];
+        assert_send(spawnable(&t, &mut buf)).await.unwrap();
+        assert_eq!(buf, [0x40, 0x41]);
+        assert_eq!(t.0.reads(), 2);
+        // And through the plain trait, as code written against `ScdcTransport` uses it.
+        let (written, read, block) = round_trip_plain(&mut t, &mut buf).await;
+        assert_eq!((written, read, block), (Ok(()), Ok(0xAB), Ok(())));
+        assert_eq!(buf, [0xAB, 0x21]);
+    }
+
+    #[pollster::test]
+    async fn bytewise_on_an_unsized_transport() {
+        // `?Sized`: `ScdcTransport` has `async fn`s, so it has no `dyn` form, but a
+        // transport can still be unsized, here one whose registers are a slice.
+        struct Regs<R: ?Sized>(R);
+        impl ScdcTransport for Regs<[u8]> {
+            type Error = ();
+            async fn read(&self, reg: u8) -> Result<u8, ()> {
+                self.0.get(reg as usize).copied().ok_or(())
+            }
+            async fn write(&mut self, _reg: u8, _value: u8) -> Result<(), ()> {
+                Err(())
+            }
+            async fn read_block(&self, reg: u8, buf: &mut [u8]) -> Result<(), ()> {
+                read_block_bytewise(self, reg, buf).await
+            }
+        }
+        let t: &mut Regs<[u8]> = &mut Regs([0x10, 0x11, 0x12]);
+        let mut buf = [0u8; 2];
+        read_block_bytewise(t, 0x01, &mut buf).await.unwrap();
+        assert_eq!(buf, [0x11, 0x12]);
+        assert_eq!(t.read_block(0x02, &mut buf).await, Err(()));
+        assert_eq!(t.write(0x00, 0xAB).await, Err(()));
     }
 
     #[pollster::test]
