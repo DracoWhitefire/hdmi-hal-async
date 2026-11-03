@@ -32,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The crate's scope, as its docs now say: traits and the glue between its own traits; no
   hardware or platform implementations, no policy, no clocks.
 
+## [0.3.1] - 2026-11-03
+
 ### Changed
 
 - **`display-types` requirement widened to `>=0.4.3, <0.6`**, so both 0.4.3 and 0.5 are
