@@ -1,6 +1,6 @@
 [package]
 name = "hdmi-hal-async"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2024"
 rust-version = "1.85"
 readme = "README.md"
@@ -13,7 +13,7 @@ categories = ["embedded", "hardware-support", "no-std", "no-std::no-alloc", "asy
 
 [dependencies]
 hdmi-hal = { version = "0.6", default-features = false }
-display-types = { version = "0.4", default-features = false }
+display-types = { version = ">=0.4.3, <0.6", default-features = false }
 
 [dev-dependencies]
 pollster = { version = "0.3", features = ["macro"] }

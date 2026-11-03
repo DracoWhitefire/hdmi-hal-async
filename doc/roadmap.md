@@ -1,14 +1,35 @@
 # Roadmap
 
+What each release contains is in the [changelog](../CHANGELOG.md); this page is about
+what comes next.
+
 ## Planned
 
 Mirrored from `hdmi-hal`: each item lands there first and here in the same release, with
 the same shape. See `hdmi-hal`'s
-[`doc/roadmap.md`](https://github.com/DracoWhitefire/hdmi-hal/blob/main/doc/roadmap.md)
+[`doc/roadmap.md`](https://github.com/ashlar-display/hdmi-hal/blob/main/doc/roadmap.md)
 for the details.
 
+- **PHY traits by link mode (breaking)** — `HdmiPhy` and `SendHdmiPhy` renamed `FrlPhy` and
+  `SendFrlPhy`, with no alias; a new `TmdsPhy` with its `Send` twin `SendTmdsPhy`; the power
+  trait; the clock and delay traits, where the async delay gets a hand-written `Send` twin
+  as the other traits have (generic code bounded by embedded-hal-async's `DelayNs` cannot
+  produce a `Send` future, and that crate has no `Send` twin); a cancellation clause for the
+  PHY traits' futures, matching `ScdcTransport`'s.
+- **`DdcBus` (breaking)** — the async `ddc::DdcBus` with its `Send` twin `SendDdcBus`
+  (`Send + Sync`, since its methods take `&self`), the same contract as `hdmi-hal`'s, and
+  the cancellation clause `ScdcTransport` has: an implementation stays usable after a dropped
+  call or says it does not, and the contents of `buf` are then undefined. `capabilities()`
+  is a plain `fn`. `scdc::ScdcOverDdc` implements `ScdcTransport` over it, and
+  `scdc::SendScdcOverDdc` implements `SendScdcTransport`, for code bounded by the `Send`
+  twins: one generic type cannot implement both (E0119). Both take any handle that
+  dereferences to the bus. No forwarding impl of `DdcBus` for `&B`: next to the twin's
+  blanket impl it would conflict (E0119), so sharing goes through the handle. The
+  `DdcError` bound on `ScdcTransport::Error` and its `Send` twin, and re-exports of
+  `hdmi-hal`'s `DdcError`, `DdcErrorKind`, `NoAcknowledgeSource`, `EddcTarget` and
+  `DdcCapabilities`, as for the PHY types.
 - **Further PHY configuration** — lane mapping, TMDS pre-emphasis and swing,
-  spread-spectrum clocking and power states, each decided when the layer that needs it is
-  built. As trait methods with default implementations they are not breaking changes; as
-  required methods they would be.
-- **CEC line trait** — a single-wire CEC bus access primitive, when CEC work begins.
+  spread-spectrum clocking and power states beyond off and on, each decided when the layer
+  that needs it is built. As trait methods with default implementations they are not
+  breaking changes; as required methods they would be.
+- **CEC traits** — message-level and bit-level, when CEC work begins.
