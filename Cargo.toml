@@ -17,3 +17,8 @@ display-types = { version = ">=0.4.3, <0.6", default-features = false }
 
 [dev-dependencies]
 pollster = { version = "0.3", features = ["macro"] }
+
+# Prototype against hdmi-hal's unreleased breaking release (release order step 2); removed
+# when hdmi-hal is released.
+[patch.crates-io]
+hdmi-hal = { git = "https://github.com/ashlar-display/hdmi-hal", branch = "feat/tmds-phy" }
