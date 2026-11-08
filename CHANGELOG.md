@@ -21,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`phy::PhyPower`, the async PHY power trait, and its `Send` twin `SendPhyPower`**, with
+  hdmi-hal's contract: `power_on` (output stopped, no mode entered) and `power_off` (no mode
+  left), both callable in any state; a trait of its own, not a supertrait of the mode
+  traits. Its cancellation clause: after a dropped call the power state is unknown, and
+  `power_off` again recovers, or the implementation says how to.
 - **A cancellation clause for `FrlPhy` and `SendFrlPhy`**, as the other async traits have:
   a dropped call may or may not have applied its setting; each method sets a whole state,
   so calling it again with the state wanted recovers, or the implementation says how to.

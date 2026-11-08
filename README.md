@@ -79,9 +79,10 @@ async fn configure_frl<T: ScdcTransport>(transport: &mut T) -> Result<(), T::Err
 
 The plain traits promise nothing about their futures, so code generic over them cannot
 spawn on a multi-threaded executor. For that, each trait has a `Send` twin,
-`phy::SendFrlPhy`, `phy::SendTmdsPhy` and `scdc::SendScdcTransport`: the same methods, returning futures
-that are `Send`, with errors that are `Send`. A transport twin is also `Sync`, because
-`read` takes `&self`.
+`phy::SendFrlPhy`, `phy::SendTmdsPhy`, `phy::SendPhyPower`, `scdc::SendScdcTransport` and
+`ddc::SendDdcBus`: the same methods, returning futures that are `Send`, with errors that
+are `Send`. The transport and bus twins are also `Sync`, because their methods take
+`&self`.
 
 ```rust
 use hdmi_hal_async::scdc::SendScdcTransport;

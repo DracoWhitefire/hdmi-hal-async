@@ -15,8 +15,9 @@ pub use hdmi_hal::phy::{
 /// training patterns, FRL output mode, and each lane's TxFFE level (FRL's transmitter
 /// equalization, a combination of pre-shoot and de-emphasis) through
 /// [`adjust_equalization`](Self::adjust_equalization). TMDS is [`TmdsPhy`]'s, the source's
-/// scrambler included. Further PHY configuration (lane mapping, spread-spectrum clocking and
-/// power states) is not covered yet; it is planned for when the mode-setting layer needs it.
+/// scrambler included, and power is [`PhyPower`]'s. Further PHY configuration (lane mapping,
+/// spread-spectrum clocking and power states beyond off and on) is not covered yet; it is
+/// planned for when the mode-setting layer needs it.
 /// Vendor-specific register sequences are an implementation detail of each backend.
 ///
 /// On a PHY that also implements [`TmdsPhy`], entering one mode leaves the other:
@@ -156,7 +157,7 @@ impl<T: SendFrlPhy> FrlPhy for T {
 ///
 /// Not covered: electrical settings (swing, pre-emphasis, lane mapping), which are the
 /// implementation's; the video pipeline beyond what [`TmdsVideo`] gives the PHY; hotplug and
-/// RX sense; and power.
+/// RX sense; and power, which is [`PhyPower`]'s.
 ///
 /// On a PHY that also implements [`FrlPhy`], entering one mode leaves the other:
 /// [`configure`](Self::configure) leaves FRL.
@@ -205,7 +206,8 @@ pub trait TmdsPhy {
     async fn start_output(&mut self) -> Result<(), Self::Error>;
 
     /// Stop whatever the PHY transmits: TMDS clock and data or, on a PHY still in FRL, FRL
-    /// transmission. Keeps the PHY powered and configured.
+    /// transmission. Keeps the PHY powered and configured, unlike
+    /// [`PhyPower::power_off`].
     ///
     /// Callable in any state, powered off included; stopping a stopped output is not an
     /// error.
@@ -270,6 +272,79 @@ impl<T: SendTmdsPhy> TmdsPhy for T {
 
     fn stop_output(&mut self) -> impl Future<Output = Result<(), Self::Error>> {
         <T as SendTmdsPhy>::stop_output(self)
+    }
+}
+
+/// Async power control of a transmitter PHY, shared by [`TmdsPhy`] and [`FrlPhy`].
+///
+/// This is the async counterpart to `hdmi_hal::phy::PhyPower`. The trait contract is
+/// identical; only the method signatures gain `async`.
+///
+/// A trait of its own, not a supertrait of the mode traits: link training and TMDS
+/// bring-up bound on a mode trait alone and never change the power, and a PHY that is
+/// always on implements the mode traits only. A caller that powers the PHY, on unplug and
+/// before a bring-up, bounds on `PhyPower` as well. One PHY implementing several of these
+/// traits may use one error type for all of them.
+///
+/// For a PHY implementing both mode traits, entering one mode leaves the other:
+/// [`TmdsPhy::configure`] leaves FRL, and [`FrlPhy::set_frl_rate`] with a rate leaves TMDS;
+/// `set_frl_rate(NotSupported)` turns FRL off and enters nothing.
+///
+/// # Cancellation
+///
+/// Either future may be dropped before it completes, for example by a deadline in the
+/// caller. The power state is then unknown. [`power_off`](Self::power_off) again recovers:
+/// it is callable in any state. An implementation for which that does not hold must say so
+/// in its documentation: what a cancelled call leaves behind, and how to recover.
+///
+/// A caller that needs to stop early can avoid the question: check its deadline or cancel
+/// signal before each call and stop there, rather than dropping a future mid-flight.
+pub trait PhyPower {
+    /// Error type returned by power operations.
+    type Error: core::fmt::Debug;
+
+    /// Power the PHY on, leaving the output stopped and no mode entered; the caller then
+    /// enters one, with [`TmdsPhy::configure`] or [`FrlPhy::set_frl_rate`].
+    ///
+    /// Powering on a PHY that is on is not an error, and does not change a mode already
+    /// entered.
+    async fn power_on(&mut self) -> Result<(), Self::Error>;
+
+    /// Power the PHY off: stop any output and leave no mode. Afterwards the PHY holds no
+    /// TMDS configuration and no FRL rate, so a bring-up must configure it again.
+    ///
+    /// Callable in any state; powering off a PHY that is off is not an error.
+    async fn power_off(&mut self) -> Result<(), Self::Error>;
+}
+
+/// [`PhyPower`] with `Send` futures, for code that powers the PHY from a task on a
+/// multi-threaded executor.
+///
+/// The same methods and contract, cancellation included, each returning a future that is
+/// `Send`, and errors that are `Send` too. Every `SendPhyPower` is a `PhyPower`, through a
+/// blanket implementation; a type implements one of the two. As with [`SendFrlPhy`], bound
+/// generic code by `SendPhyPower` alone, and with both traits in scope call
+/// `SendPhyPower::power_off(…)` to avoid an ambiguous method call.
+pub trait SendPhyPower: Send {
+    /// Error type returned by power operations.
+    type Error: core::fmt::Debug + Send;
+
+    /// See [`PhyPower::power_on`].
+    fn power_on(&mut self) -> impl Future<Output = Result<(), Self::Error>> + Send;
+
+    /// See [`PhyPower::power_off`].
+    fn power_off(&mut self) -> impl Future<Output = Result<(), Self::Error>> + Send;
+}
+
+impl<T: SendPhyPower> PhyPower for T {
+    type Error = <T as SendPhyPower>::Error;
+
+    fn power_on(&mut self) -> impl Future<Output = Result<(), Self::Error>> {
+        <T as SendPhyPower>::power_on(self)
+    }
+
+    fn power_off(&mut self) -> impl Future<Output = Result<(), Self::Error>> {
+        <T as SendPhyPower>::power_off(self)
     }
 }
 
@@ -703,5 +778,132 @@ mod tests {
         let _: crate::TmdsPhyConfig = config;
         let caps: crate::phy::TmdsPhyCapabilities = hdmi_hal::phy::TmdsPhyCapabilities::new(0);
         let _: crate::TmdsPhyCapabilities = caps;
+    }
+
+    /// A PHY with power, implementing both `TmdsPhy` and `PhyPower` with one error type, as
+    /// the trait's documentation allows.
+    struct PoweredPhy {
+        tmds: MockTmdsPhy,
+        powered: bool,
+    }
+
+    impl PhyPower for PoweredPhy {
+        type Error = core::convert::Infallible;
+
+        async fn power_on(&mut self) -> Result<(), Self::Error> {
+            self.powered = true;
+            Ok(())
+        }
+
+        async fn power_off(&mut self) -> Result<(), Self::Error> {
+            self.powered = false;
+            self.tmds.output = false;
+            self.tmds.config = None;
+            Ok(())
+        }
+    }
+
+    impl TmdsPhy for PoweredPhy {
+        type Error = <Self as PhyPower>::Error;
+
+        fn capabilities(&self) -> TmdsPhyCapabilities {
+            self.tmds.capabilities()
+        }
+
+        async fn configure(&mut self, config: TmdsPhyConfig) -> Result<(), Self::Error> {
+            self.tmds.configure(config).await
+        }
+
+        async fn set_scrambling(&mut self, enabled: bool) -> Result<(), Self::Error> {
+            self.tmds.set_scrambling(enabled).await
+        }
+
+        async fn start_output(&mut self) -> Result<(), Self::Error> {
+            self.tmds.start_output().await
+        }
+
+        async fn stop_output(&mut self) -> Result<(), Self::Error> {
+            self.tmds.stop_output().await
+        }
+    }
+
+    /// A caller that powers the PHY bounds on both traits.
+    async fn power_cycle<P: PhyPower + TmdsPhy>(phy: &mut P) {
+        PhyPower::power_off(phy).await.unwrap();
+        PhyPower::power_off(phy).await.unwrap();
+        PhyPower::power_on(phy).await.unwrap();
+        PhyPower::power_on(phy).await.unwrap();
+        TmdsPhy::configure(phy, CONFIG_4K60).await.unwrap();
+        TmdsPhy::start_output(phy).await.unwrap();
+    }
+
+    #[pollster::test]
+    async fn phy_power_composes_with_a_mode_trait() {
+        let mut phy = PoweredPhy {
+            tmds: MockTmdsPhy {
+                output: true,
+                ..MockTmdsPhy::default()
+            },
+            powered: true,
+        };
+        power_cycle(&mut phy).await;
+        assert!(phy.powered && phy.tmds.output);
+        assert_eq!(phy.tmds.config, Some(CONFIG_4K60));
+        phy.power_off().await.unwrap();
+        assert!(!phy.powered && !phy.tmds.output);
+        assert_eq!(phy.tmds.config, None);
+    }
+
+    /// Implements only the `Send` twin; it counts the calls.
+    #[derive(Default)]
+    struct SendMockPower {
+        on: u32,
+        off: u32,
+    }
+
+    impl SendPhyPower for SendMockPower {
+        type Error = core::convert::Infallible;
+
+        async fn power_on(&mut self) -> Result<(), Self::Error> {
+            self.on += 1;
+            Ok(())
+        }
+
+        async fn power_off(&mut self) -> Result<(), Self::Error> {
+            self.off += 1;
+            Ok(())
+        }
+    }
+
+    async fn cycle_plain<P: PhyPower>(phy: &mut P) -> [Result<(), P::Error>; 2] {
+        [phy.power_off().await, phy.power_on().await]
+    }
+
+    async fn cycle_send<P: SendPhyPower>(phy: &mut P) -> [Result<(), P::Error>; 2] {
+        [
+            SendPhyPower::power_off(phy).await,
+            SendPhyPower::power_on(phy).await,
+        ]
+    }
+
+    /// The compiler proves this `Send` bound for every `P: SendPhyPower`.
+    fn spawnable_power<P: SendPhyPower>(
+        phy: &mut P,
+    ) -> impl Future<Output = [Result<(), P::Error>; 2]> + Send + '_ {
+        cycle_send(phy)
+    }
+
+    #[pollster::test]
+    async fn send_power_twin_is_usable_as_phy_power() {
+        let mut phy = SendMockPower::default();
+        assert_eq!(cycle_plain(&mut phy).await, [Ok(()); 2]);
+        assert_eq!((phy.on, phy.off), (1, 1));
+    }
+
+    #[pollster::test]
+    async fn send_power_twin_futures_are_send_in_generic_code() {
+        let mut phy = SendMockPower::default();
+        assert_eq!(assert_send(spawnable_power(&mut phy)).await, [Ok(()); 2]);
+        assert_eq!((phy.on, phy.off), (1, 1));
     }
 }

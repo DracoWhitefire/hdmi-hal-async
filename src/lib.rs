@@ -8,7 +8,7 @@
 //! hardware or platform implementations, no policy, no clocks.
 //!
 //! Each trait also has a `Send` twin, [`phy::SendFrlPhy`], [`phy::SendTmdsPhy`],
-//! [`scdc::SendScdcTransport`] and [`ddc::SendDdcBus`], for code that spawns work on a multi-threaded executor: the same
+//! [`phy::SendPhyPower`], [`scdc::SendScdcTransport`] and [`ddc::SendDdcBus`], for code that spawns work on a multi-threaded executor: the same
 //! methods, returning futures that are `Send`. Every twin implementation is an
 //! implementation of the plain trait as well.
 
@@ -17,7 +17,7 @@
 // async fn in traits does not guarantee Send on the returned futures. This is intentional
 // for the plain traits: they serve single-threaded embedded executors (e.g. Embassy), where
 // Send is not required, the same decision embedded-hal-async made. The Send twins
-// (SendFrlPhy, SendTmdsPhy, SendScdcTransport, SendDdcBus) are for multi-threaded executors.
+// (SendFrlPhy, SendTmdsPhy, SendPhyPower, SendScdcTransport, SendDdcBus) are for multi-threaded executors.
 #![allow(async_fn_in_trait)]
 
 pub mod ddc;
