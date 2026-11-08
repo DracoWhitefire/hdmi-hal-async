@@ -17,6 +17,7 @@ display-types = { version = ">=0.4.3, <0.6", default-features = false }
 
 [dev-dependencies]
 pollster = { version = "0.3", features = ["macro"] }
+embedded-hal-async = "1.0"
 
 # Prototype against hdmi-hal's unreleased breaking release (release order step 2); removed
 # when hdmi-hal is released.

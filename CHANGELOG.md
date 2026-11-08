@@ -21,6 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`time` module: the async `Delay` and its `Send` twin `SendDelay`**, with hdmi-hal's
+  contract (wait at least the duration given; infallible), and hdmi-hal's `Timestamp` and
+  `Clock` re-exported: reading a clock does not wait, so it stays neither `async` nor
+  fallible. Its cancellation clause: a dropped delay has done nothing that needs undoing.
+  The module docs show a `Delay` over embedded-hal-async's `DelayNs`; the crate itself
+  does not depend on it.
 - **`phy::PhyPower`, the async PHY power trait, and its `Send` twin `SendPhyPower`**, with
   hdmi-hal's contract: `power_on` (output stopped, no mode entered) and `power_off` (no mode
   left), both callable in any state; a trait of its own, not a supertrait of the mode
