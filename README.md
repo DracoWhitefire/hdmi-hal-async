@@ -25,9 +25,11 @@ Async hardware abstraction traits for the HDMI stack.
 
 `hdmi-hal-async` is the async companion to [`hdmi-hal`](https://crates.io/crates/hdmi-hal),
 following the same split as `embedded-hal` / `embedded-hal-async`. It mirrors each trait
-in `hdmi-hal` with `async fn` methods and otherwise identical signatures — `ScdcTransport`
-for raw SCDC register access, `FrlPhy` and `TmdsPhy` for transmitter PHY control. Data types such as
-`EqParams` are defined in `hdmi-hal` and re-exported here rather than duplicated.
+in `hdmi-hal` with `async fn` methods and otherwise identical signatures — `DdcBus` for the
+connector's DDC bus, `ScdcTransport` for raw SCDC register access, `FrlPhy` and `TmdsPhy`
+for transmitter PHY control, `PhyPower` for its power, and `Delay` for waiting (with
+`hdmi-hal`'s `Clock`, which does not wait, re-exported). Data types such as `EqParams` are
+defined in `hdmi-hal` and re-exported here rather than duplicated.
 
 Sync consumers continue to use `hdmi-hal` directly. Async platform backends (Embassy
 drivers, async kernel drivers) implement the traits here. The two crates impose no

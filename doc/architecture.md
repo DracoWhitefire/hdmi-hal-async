@@ -6,6 +6,8 @@
 as `embedded-hal` / `embedded-hal-async`. It defines async versions of the traits in
 `hdmi-hal`:
 
+- `ddc::DdcBus` — the connector's whole DDC bus: any 7-bit target, and E-DDC reads of EDID
+  and DisplayID
 - `scdc::ScdcTransport` — raw byte-level SCDC register access
 - `phy::FrlPhy` — what FRL link training needs from the transmitter PHY: FRL rate, link
   training patterns, FRL output mode and each lane's TxFFE level
@@ -15,16 +17,19 @@ as `embedded-hal` / `embedded-hal-async`. It defines async versions of the trait
 - `time::Delay` — waiting, for the procedures that drive these traits; `time::Clock` and
   `time::Timestamp` are `hdmi-hal`'s, re-exported, since reading a clock does not wait
 
-and a `Send` twin of each, `scdc::SendScdcTransport`, `phy::SendFrlPhy`,
+and a `Send` twin of each, `ddc::SendDdcBus`, `scdc::SendScdcTransport`, `phy::SendFrlPhy`,
 `phy::SendTmdsPhy`, `phy::SendPhyPower` and `time::SendDelay`, for code that spawns on a
 multi-threaded executor (see "`Send` futures: the twins" below).
 
 Data types (`LtpPattern`, `LanePatterns`, `FrlOutput`, `EqParams`, `LaneEqParams`,
 `TxFfeLevel`, `TxFfeRestrictions`, `TmdsClockRatio`, `TmdsPhyConfig`, `TmdsVideo`,
-`TmdsPhyCapabilities`, `Timestamp`) are defined in `hdmi-hal` and re-exported here; they
-are not duplicated.
+`TmdsPhyCapabilities`, `Timestamp`, and `ddc`'s `DdcError`, `DdcErrorKind`,
+`NoAcknowledgeSource`, `EddcTarget`, `DdcCapabilities` and addresses) are defined in
+`hdmi-hal` and re-exported here; they are not duplicated.
 
-The crate is traits-only. No implementations live here.
+The crate holds traits, and the glue between its own traits: the twins' blanket
+implementations, `read_block_bytewise`, and the adapters `ScdcOverDdc` and
+`SendScdcOverDdc`. No hardware, platform or clock implementations, no policy.
 
 ---
 
@@ -47,7 +52,7 @@ concrete types, or is bounded by the `Send` twins below.
 
 ## `Send` futures: the twins
 
-Each twin (`phy::SendFrlPhy`, `phy::SendTmdsPhy`, `phy::SendPhyPower`,
+Each twin (`ddc::SendDdcBus`, `phy::SendFrlPhy`, `phy::SendTmdsPhy`, `phy::SendPhyPower`,
 `scdc::SendScdcTransport`, `time::SendDelay`) has the same methods and contract as its
 plain trait, cancellation included, each returning a future that is `Send`. The first twins
 came in 0.2.1, `SendFrlPhy` then named `SendHdmiPhy`. This is the pattern `trait_variant`
@@ -78,9 +83,10 @@ impl<T: SendFrlPhy> FrlPhy for T {
   `PhyPower`'s `Debug`), the twin adds `Send` to that bound. `SendDelay` has no error.
 - **Plain reports stay plain functions** in the twin too: `SendTmdsPhy::capabilities` is a
   `fn`, forwarded by the blanket implementation.
-- **`SendScdcTransport: Send + Sync`**: `read` takes `&self`, and a future holding `&self`
-  is only `Send` when the transport is `Sync`. Interior state for reads therefore needs a
-  `Sync` type (an atomic or a lock, not a `Cell`).
+- **`SendScdcTransport: Send + Sync`** and **`SendDdcBus: Send + Sync`**: `read` (every
+  method, for the bus) takes `&self`, and a future holding `&self` is only `Send` when the
+  type is `Sync`. Interior state therefore needs a `Sync` type (an atomic or a lock, not a
+  `Cell`).
 - **`read_block`**: required in both traits, and the blanket implementation forwards it, so
   a twin's `read_block` is used through either trait. `read_block_bytewise` serves both: a
   twin implementation is an `ScdcTransport` through the blanket implementation, and the
@@ -113,8 +119,12 @@ The module tree mirrors `hdmi-hal` exactly:
 ```
 src/
   lib.rs          — #![no_std], module declarations, crate-level docs
+  ddc/
+    mod.rs        — async DdcBus trait and its Send twin, SendDdcBus; hdmi-hal's vocabulary
+    tests.rs      — the twin, sharing a bus that is not Send, the re-exports
   scdc/
-    mod.rs        — async ScdcTransport trait and its Send twin, SendScdcTransport
+    mod.rs        — async ScdcTransport trait and its Send twin, SendScdcTransport;
+                    read_block_bytewise; the adapters ScdcOverDdc and SendScdcOverDdc
   phy/
     mod.rs        — async FrlPhy, TmdsPhy and PhyPower traits and their Send twins
   time/
@@ -133,7 +143,7 @@ together from one task (below) and cancellation.
 
 ```rust
 pub trait ScdcTransport {
-    type Error;
+    type Error: DdcError;
 
     async fn read(&self, reg: u8) -> Result<u8, Self::Error>;
     async fn write(&mut self, reg: u8, value: u8) -> Result<(), Self::Error>;
@@ -150,8 +160,9 @@ pub async fn read_block_bytewise<T: ScdcTransport + ?Sized>(
 ) -> Result<(), T::Error> { ... }
 ```
 
-Doc comments mirror the sync version verbatim, with a note that the trait is the async
-counterpart. That includes `read_block`'s contract (one combined transfer to the layer
+The error is bounded by `DdcError`, as in `hdmi-hal`, and the twin's by `DdcError + Send`:
+every transport error carries a `DdcErrorKind`. Doc comments mirror the sync version
+verbatim, with a note that the trait is the async counterpart. That includes `read_block`'s contract (one combined transfer to the layer
 below or an error, never split, a bus driver known to split it named; no snapshot
 promised; a length limit, if any, documented and of at least 16 bytes; an empty buffer is
 `Ok` with no bus activity; on error the buffer is unspecified; past `0xFF` unspecified
@@ -210,6 +221,74 @@ backend authors:
   reads into storage that outlives any in-flight transfer (a field of the transport, or
   a `'static` buffer), copies into `buf` once the transfer completes, and has the next
   call wait for or stop the previous DMA before reusing that storage.
+
+### `ddc::DdcBus`
+
+Async version of `hdmi_hal::ddc::DdcBus`: one trait for the connector's DDC bus, with
+`write`, `write_read` and `read` on any 7-bit address and `read_segmented` for E-DDC reads
+of EDID and DisplayID. `capabilities` stays a plain `fn`: it reports, it does not touch the
+bus.
+
+```rust
+pub trait DdcBus {
+    type Error: DdcError;
+
+    fn capabilities(&self) -> DdcCapabilities;
+    async fn write(&self, addr: u8, bytes: &[u8]) -> Result<(), Self::Error>;
+    async fn write_read(&self, addr: u8, bytes: &[u8], buf: &mut [u8]) -> Result<(), Self::Error>;
+    async fn read(&self, addr: u8, buf: &mut [u8]) -> Result<(), Self::Error>;
+    async fn read_segmented(
+        &self,
+        target: EddcTarget,
+        segment: u8,
+        offset: u8,
+        buf: &mut [u8],
+    ) -> Result<(), Self::Error>;
+}
+```
+
+The contract is `hdmi-hal`'s, and `hdmi-hal`'s architecture document gives the reasons for
+each part: what each operation puts on the wire; one call one transaction, with
+`read_segmented` allowed to split into E-DDC transactions of its own; the argument checks
+before any bus activity; the E-DDC behaviour; errors that carry a `DdcErrorKind`, with no
+retries of the implementation's own; capabilities that never over-state. The trait
+documentation restates it rather than linking, as for `ScdcTransport`. Two parts only
+async code needs:
+
+- **Calls polled together from one task.** Every method takes `&self`, so `join!` can poll
+  two calls on one bus, which needs no `Sync`. The implementation serializes them, waiting
+  for the bus, and never panics, as `ScdcTransport`'s contract already says; one that
+  cannot serialize returns an error for the second call and says so.
+- **Cancellation**, as for `ScdcTransport`: what a dropped call did is unknown, whether its
+  transaction reached the bus or a write the sink. After a dropped call that reads, the
+  contents of `buf` are unspecified, partly written if the implementation splits the read.
+  An implementation should leave the bus usable for the next call, recovering it itself;
+  one that cannot documents what a cancelled call leaves and how to recover. A caller that
+  needs to stop early checks before each call instead.
+
+**`SendDdcBus`** is the twin, `Send + Sync` with `type Error: DdcError + Send`. **There is
+no forwarding implementation for `&B`**: next to the twin's blanket implementation it would
+conflict (E0119), since `&` is a fundamental type and another crate may implement
+`SendDdcBus` for a reference to its own type. Users hold a handle instead: code over the bus
+is generic over `H: Deref<Target: DdcBus>`, so a bus that is not `Send` (embassy's) is
+shared through `&'static B` or `Rc<B>`, and a `SendDdcBus` through `&B` or `Arc<B>`.
+
+#### `ScdcOverDdc` and `SendScdcOverDdc`
+
+`scdc::ScdcOverDdc<H>` is the async `ScdcTransport` over a `DdcBus`, with `hdmi-hal`'s
+behaviour: `read` and `read_block` are one `write_read` at 0x54 each, `write` one `write`,
+its errors are the bus's, and `new` and `bytewise` return the handle when the bus cannot
+serve SCDC.
+
+It cannot also implement `SendScdcTransport`: the twin's blanket implementation already
+provides `ScdcTransport` for every `SendScdcTransport`, so one generic type implementing both
+conflicts (E0119). Code bounded by the twins, such as a client generic over
+`SendScdcTransport`, therefore takes **`scdc::SendScdcOverDdc<H>`**, which implements
+`SendScdcTransport` (and through the blanket `ScdcTransport`) for a handle that is
+`Send + Sync` and dereferences to a `SendDdcBus`. This is the stack's "second type"
+pattern. Which to use: `ScdcOverDdc` for plain callers, and for `Send` callers that see the
+concrete type (over a `SendDdcBus`, its futures are `Send` wherever the compiler sees the
+type); `SendScdcOverDdc` where code is bounded by the twins.
 
 ### `phy::FrlPhy`
 
@@ -339,9 +418,15 @@ pub use hdmi_hal::phy::{
 };
 // src/time/mod.rs: the same paths as `hdmi_hal::time::*`
 pub use hdmi_hal::time::{Clock, Timestamp};
+// src/ddc/mod.rs: the same paths as `hdmi_hal::ddc::*`
+pub use hdmi_hal::ddc::{
+    DDC_CI, DISPLAYID, DdcCapabilities, DdcError, DdcErrorKind, EDID, EddcTarget, HDCP_PRIMARY,
+    HDCP_SECONDARY, MAX_SEGMENT, NoAcknowledgeSource, SCDC, SEGMENT_POINTER, is_usable_address,
+};
 ```
 
-Code moving between the sync and async traits can keep its `phy::` and `time::` imports.
+Code moving between the sync and async traits can keep its `ddc::`, `phy::` and `time::`
+imports.
 
 `HdmiForumFrl`, which `FrlPhy::set_frl_rate` takes, is re-exported at the crate root as
 well (`hdmi_hal_async::HdmiForumFrl`, from `hdmi-hal`), so a PHY implementation needs no
@@ -362,8 +447,10 @@ and CI builds the crate for `thumbv7em-none-eabi`, a target without `std`.
 
 ## What this crate does not do
 
-- **No implementations.** Platform backends (Embassy drivers, async kernel adaptors)
-  implement the traits here; implementations do not live in this crate.
+- **No platform implementations.** Platform backends (Embassy drivers, async kernel
+  adaptors) implement the traits here; they do not live in this crate. The only
+  implementations here are glue between its own traits: the twins' blanket
+  implementations and the adapters from `DdcBus` to `ScdcTransport`.
 - **No sync-to-async adapters.** A wrapper that makes a sync `ScdcTransport` implement
   the async trait (by blocking) would belong in a compatibility shim crate, not here.
   The same split exists between `embedded-hal` and `embedded-hal-async`.
@@ -376,9 +463,10 @@ and CI builds the crate for `thumbv7em-none-eabi`, a target without `std`.
 
 ## Testing
 
-Unit tests for a traits-only crate are minimal but still useful. Each trait module has a
-`#[cfg(test)]` block with mock implementors, mirroring `hdmi-hal`: `MockTransport` in
-`scdc`; `MockPhy`, `MockTmdsPhy` and a PHY implementing `TmdsPhy` and `PhyPower` with one
+Unit tests for a crate of traits are minimal but still useful. Each trait module has a
+`#[cfg(test)]` block with mock implementors, mirroring `hdmi-hal`: in `ddc`, a `Send` bus
+used through both traits and a bus that is not `Send`, shared through references and `Rc`;
+`MockTransport` and the adapters over a bus in `scdc`; `MockPhy`, `MockTmdsPhy` and a PHY implementing `TmdsPhy` and `PhyPower` with one
 error type in `phy`; a clock and delay on one type in `time`, the delay advancing the
 clock. Each twin has a mock that implements only the twin, driven through both traits,
 with a generic function whose future must be `Send`. That the mocks compile shows the
