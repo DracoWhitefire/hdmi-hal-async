@@ -26,7 +26,7 @@ Async hardware abstraction traits for the HDMI stack.
 `hdmi-hal-async` is the async companion to [`hdmi-hal`](https://crates.io/crates/hdmi-hal),
 following the same split as `embedded-hal` / `embedded-hal-async`. It mirrors each trait
 in `hdmi-hal` with `async fn` methods and otherwise identical signatures — `ScdcTransport`
-for raw SCDC register access and `HdmiPhy` for transmitter PHY control. Data types such as
+for raw SCDC register access, `FrlPhy` and `TmdsPhy` for transmitter PHY control. Data types such as
 `EqParams` are defined in `hdmi-hal` and re-exported here rather than duplicated.
 
 Sync consumers continue to use `hdmi-hal` directly. Async platform backends (Embassy
@@ -79,7 +79,7 @@ async fn configure_frl<T: ScdcTransport>(transport: &mut T) -> Result<(), T::Err
 
 The plain traits promise nothing about their futures, so code generic over them cannot
 spawn on a multi-threaded executor. For that, each trait has a `Send` twin,
-`phy::SendHdmiPhy` and `scdc::SendScdcTransport`: the same methods, returning futures
+`phy::SendFrlPhy`, `phy::SendTmdsPhy` and `scdc::SendScdcTransport`: the same methods, returning futures
 that are `Send`, with errors that are `Send`. A transport twin is also `Sync`, because
 `read` takes `&self`.
 
@@ -102,7 +102,7 @@ fn spawn_frl_start<T: SendScdcTransport + 'static>(mut transport: T) {
 A twin implementation is also an implementation of the plain trait, so it works with
 code written against either. Import the trait your code is bounded by: with both in
 scope, method calls on a twin implementation are ambiguous. Bound generic code by the twin
-alone, as above: adding `+ ScdcTransport` or `+ HdmiPhy`, which the twins imply anyway,
+alone, as above: adding `+ ScdcTransport` or `+ FrlPhy`, which the twins imply anyway,
 makes the compiler use that bound instead of the blanket implementation, and the futures
 are no longer known to be `Send`.
 

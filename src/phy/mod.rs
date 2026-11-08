@@ -6,23 +6,45 @@ pub use hdmi_hal::phy::{
     TmdsPhyCapabilities, TmdsPhyConfig, TmdsVideo, TxFfeLevel, TxFfeRestrictions,
 };
 
-/// Async link-level control of an HDMI 2.1 transmitter PHY.
+/// Async FRL control of an HDMI 2.1 transmitter PHY.
 ///
-/// This is the async counterpart to `hdmi_hal::phy::HdmiPhy`. The trait contract is
+/// This is the async counterpart to `hdmi_hal::phy::FrlPhy`. The trait contract is
 /// identical; only the method signatures gain `async`.
 ///
 /// Covers what FRL link training needs from the transmitter: FRL rate selection, link
-/// training patterns, FRL output mode, scrambling, and each lane's TxFFE level (FRL's
-/// transmitter equalization, a combination of pre-shoot and de-emphasis) through
-/// [`adjust_equalization`](Self::adjust_equalization). Further PHY configuration (lane
-/// mapping, TMDS pre-emphasis and swing, spread-spectrum clocking and power states) is not
-/// covered yet; it is planned for when the mode-setting layer needs it. Vendor-specific
-/// register sequences are an implementation detail of each backend.
-pub trait HdmiPhy {
+/// training patterns, FRL output mode, and each lane's TxFFE level (FRL's transmitter
+/// equalization, a combination of pre-shoot and de-emphasis) through
+/// [`adjust_equalization`](Self::adjust_equalization). TMDS is [`TmdsPhy`]'s, the source's
+/// scrambler included. Further PHY configuration (lane mapping, spread-spectrum clocking and
+/// power states) is not covered yet; it is planned for when the mode-setting layer needs it.
+/// Vendor-specific register sequences are an implementation detail of each backend.
+///
+/// On a PHY that also implements [`TmdsPhy`], entering one mode leaves the other:
+/// [`set_frl_rate`](Self::set_frl_rate) with a rate leaves TMDS.
+///
+/// # Cancellation
+///
+/// Any of these futures may be dropped before it completes, for example by a deadline in
+/// the caller. What a dropped call has done is then unknown: the PHY may or may not have
+/// applied the setting, or may be part-way through it.
+///
+/// Each method sets a whole state (the rate, the per-lane patterns, the output mode, the
+/// equalization), so calling it again with the state wanted recovers from a dropped call.
+/// An implementation for which that does not hold must say so in its documentation: what a
+/// cancelled call leaves behind, and how to recover.
+///
+/// A caller that needs to stop early can avoid the question: check its deadline or cancel
+/// signal before each call and stop there, rather than dropping a future mid-flight.
+pub trait FrlPhy {
     /// Error type returned by PHY operations.
     type Error;
 
-    /// Select the FRL rate (or TMDS). Triggers the required lane reconfiguration sequence.
+    /// Select the FRL rate, or turn FRL off. Triggers the required lane reconfiguration
+    /// sequence.
+    ///
+    /// A rate enters FRL, leaving TMDS on a PHY that also does TMDS.
+    /// [`HdmiForumFrl::NotSupported`] turns FRL off and enters no other mode: entering TMDS
+    /// is [`TmdsPhy::configure`]'s.
     ///
     /// Returns once the PHY transmits at `rate`, after any bring-up its hardware needs to
     /// get there — the Xilinx HDMI 2.1 transmitter, for example, holds a Nyquist clock
@@ -39,98 +61,86 @@ pub trait HdmiPhy {
 
     /// Adjust equalization parameters after link training feedback.
     async fn adjust_equalization(&mut self, params: EqParams) -> Result<(), Self::Error>;
-
-    /// Enable or disable scrambling on the PHY.
-    async fn set_scrambling(&mut self, enabled: bool) -> Result<(), Self::Error>;
 }
 
-/// [`HdmiPhy`] with `Send` futures, for code that spawns link training on a multi-threaded
+/// [`FrlPhy`] with `Send` futures, for code that spawns link training on a multi-threaded
 /// executor.
 ///
-/// `HdmiPhy`'s `async fn`s promise nothing about their futures, so code generic over
-/// `P: HdmiPhy` cannot spawn a future that calls them, however `P` is bounded. This trait
-/// has the same methods and contract, each returning a future that is `Send`, and errors
+/// `FrlPhy`'s `async fn`s promise nothing about their futures, so code generic over
+/// `P: FrlPhy` cannot spawn a future that calls them, however `P` is bounded. This trait
+/// has the same methods and contract, cancellation included, each returning a future that
+/// is `Send`, and errors
 /// that are `Send` too: a spawned task returns them. Implementations still write
 /// `async fn`; the compiler checks that each future is `Send`.
 ///
-/// Every `SendHdmiPhy` is an `HdmiPhy`, through a blanket implementation, so it works
-/// with everything written against `HdmiPhy` as well; a type implements one of the two
-/// (implementing both conflicts with the blanket implementation). A `SendHdmiPhy` type
+/// Every `SendFrlPhy` is an `FrlPhy`, through a blanket implementation, so it works
+/// with everything written against `FrlPhy` as well; a type implements one of the two
+/// (implementing both conflicts with the blanket implementation). A `SendFrlPhy` type
 /// has both traits' methods, so with both traits in scope a method call on it is
 /// ambiguous: import only the trait the code is bounded by, or call
-/// `SendHdmiPhy::set_frl_rate(…)`.
+/// `SendFrlPhy::set_frl_rate(…)`.
 ///
-/// Bound generic code by `SendHdmiPhy` alone. Adding `+ HdmiPhy`, which it implies
+/// Bound generic code by `SendFrlPhy` alone. Adding `+ FrlPhy`, which it implies
 /// anyway, makes the compiler use that bound instead of the blanket implementation, and
 /// the futures are no longer known to be `Send`.
-pub trait SendHdmiPhy: Send {
+pub trait SendFrlPhy: Send {
     /// Error type returned by PHY operations.
     type Error: Send;
 
-    /// See [`HdmiPhy::set_frl_rate`].
+    /// See [`FrlPhy::set_frl_rate`].
     fn set_frl_rate(
         &mut self,
         rate: HdmiForumFrl,
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 
-    /// See [`HdmiPhy::send_ltp`].
+    /// See [`FrlPhy::send_ltp`].
     fn send_ltp(
         &mut self,
         patterns: LanePatterns,
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 
-    /// See [`HdmiPhy::set_frl_output`].
+    /// See [`FrlPhy::set_frl_output`].
     fn set_frl_output(
         &mut self,
         output: FrlOutput,
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 
-    /// See [`HdmiPhy::adjust_equalization`].
+    /// See [`FrlPhy::adjust_equalization`].
     fn adjust_equalization(
         &mut self,
         params: EqParams,
-    ) -> impl Future<Output = Result<(), Self::Error>> + Send;
-
-    /// See [`HdmiPhy::set_scrambling`].
-    fn set_scrambling(
-        &mut self,
-        enabled: bool,
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
 }
 
-impl<T: SendHdmiPhy> HdmiPhy for T {
-    type Error = <T as SendHdmiPhy>::Error;
+impl<T: SendFrlPhy> FrlPhy for T {
+    type Error = <T as SendFrlPhy>::Error;
 
     fn set_frl_rate(
         &mut self,
         rate: HdmiForumFrl,
     ) -> impl Future<Output = Result<(), Self::Error>> {
-        <T as SendHdmiPhy>::set_frl_rate(self, rate)
+        <T as SendFrlPhy>::set_frl_rate(self, rate)
     }
 
     fn send_ltp(
         &mut self,
         patterns: LanePatterns,
     ) -> impl Future<Output = Result<(), Self::Error>> {
-        <T as SendHdmiPhy>::send_ltp(self, patterns)
+        <T as SendFrlPhy>::send_ltp(self, patterns)
     }
 
     fn set_frl_output(
         &mut self,
         output: FrlOutput,
     ) -> impl Future<Output = Result<(), Self::Error>> {
-        <T as SendHdmiPhy>::set_frl_output(self, output)
+        <T as SendFrlPhy>::set_frl_output(self, output)
     }
 
     fn adjust_equalization(
         &mut self,
         params: EqParams,
     ) -> impl Future<Output = Result<(), Self::Error>> {
-        <T as SendHdmiPhy>::adjust_equalization(self, params)
-    }
-
-    fn set_scrambling(&mut self, enabled: bool) -> impl Future<Output = Result<(), Self::Error>> {
-        <T as SendHdmiPhy>::set_scrambling(self, enabled)
+        <T as SendFrlPhy>::adjust_equalization(self, params)
     }
 }
 
@@ -148,7 +158,7 @@ impl<T: SendHdmiPhy> HdmiPhy for T {
 /// implementation's; the video pipeline beyond what [`TmdsVideo`] gives the PHY; hotplug and
 /// RX sense; and power.
 ///
-/// On a PHY that also implements [`HdmiPhy`], entering one mode leaves the other:
+/// On a PHY that also implements [`FrlPhy`], entering one mode leaves the other:
 /// [`configure`](Self::configure) leaves FRL.
 ///
 /// # Cancellation
@@ -207,7 +217,7 @@ pub trait TmdsPhy {
 ///
 /// The same methods and contract, cancellation included, each returning a future that is
 /// `Send`, and errors that are `Send` too. Every `SendTmdsPhy` is a `TmdsPhy`, through a
-/// blanket implementation; a type implements one of the two. As with [`SendHdmiPhy`], bound
+/// blanket implementation; a type implements one of the two. As with [`SendFrlPhy`], bound
 /// generic code by `SendTmdsPhy` alone, and with both traits in scope call
 /// `SendTmdsPhy::configure(…)` to avoid an ambiguous method call.
 pub trait SendTmdsPhy: Send {
@@ -267,13 +277,12 @@ impl<T: SendTmdsPhy> TmdsPhy for T {
 mod tests {
     use super::*;
 
-    /// A minimal `HdmiPhy` that records what it is given. The tests that drive it method by
+    /// A minimal `FrlPhy` that records what it is given. The tests that drive it method by
     /// method check little beyond recording — they show that the trait can be implemented
     /// and used for each method, and they keep this implementation covered. Behaviour is
     /// tested where it lives: in plumbob, against its simulated PHY.
     struct MockPhy {
         frl_rate: Option<HdmiForumFrl>,
-        scrambling: Option<bool>,
         eq_calls: u32,
         last_eq: Option<EqParams>,
         frl_output: Option<FrlOutput>,
@@ -284,7 +293,6 @@ mod tests {
         fn new() -> Self {
             Self {
                 frl_rate: None,
-                scrambling: None,
                 eq_calls: 0,
                 last_eq: None,
                 frl_output: None,
@@ -293,7 +301,7 @@ mod tests {
         }
     }
 
-    impl HdmiPhy for MockPhy {
+    impl FrlPhy for MockPhy {
         type Error = core::convert::Infallible;
 
         async fn set_frl_rate(&mut self, rate: HdmiForumFrl) -> Result<(), Self::Error> {
@@ -314,11 +322,6 @@ mod tests {
         async fn adjust_equalization(&mut self, params: EqParams) -> Result<(), Self::Error> {
             self.eq_calls += 1;
             self.last_eq = Some(params);
-            Ok(())
-        }
-
-        async fn set_scrambling(&mut self, enabled: bool) -> Result<(), Self::Error> {
-            self.scrambling = Some(enabled);
             Ok(())
         }
     }
@@ -381,28 +384,6 @@ mod tests {
     }
 
     #[pollster::test]
-    async fn set_scrambling_enable() {
-        let mut phy = MockPhy::new();
-        phy.set_scrambling(true).await.unwrap();
-        assert_eq!(phy.scrambling, Some(true));
-    }
-
-    #[pollster::test]
-    async fn set_scrambling_disable() {
-        let mut phy = MockPhy::new();
-        phy.set_scrambling(false).await.unwrap();
-        assert_eq!(phy.scrambling, Some(false));
-    }
-
-    #[pollster::test]
-    async fn set_scrambling_can_be_toggled() {
-        let mut phy = MockPhy::new();
-        phy.set_scrambling(true).await.unwrap();
-        phy.set_scrambling(false).await.unwrap();
-        assert_eq!(phy.scrambling, Some(false));
-    }
-
-    #[pollster::test]
     async fn set_frl_output_records_mode() {
         let mut phy = MockPhy::new();
         phy.set_frl_output(FrlOutput::GapOnly).await.unwrap();
@@ -440,7 +421,7 @@ mod tests {
     /// Implements only the `Send` twin; it records the calls in order.
     #[derive(Default)]
     struct SendMockPhy {
-        calls: [Option<&'static str>; 5],
+        calls: [Option<&'static str>; 4],
         n: usize,
         last_eq: Option<EqParams>,
     }
@@ -452,7 +433,7 @@ mod tests {
         }
     }
 
-    impl SendHdmiPhy for SendMockPhy {
+    impl SendFrlPhy for SendMockPhy {
         type Error = core::convert::Infallible;
 
         async fn set_frl_rate(&mut self, _rate: HdmiForumFrl) -> Result<(), Self::Error> {
@@ -475,41 +456,34 @@ mod tests {
             self.last_eq = Some(params);
             Ok(())
         }
-
-        async fn set_scrambling(&mut self, _enabled: bool) -> Result<(), Self::Error> {
-            self.record("set_scrambling");
-            Ok(())
-        }
     }
 
     /// The result of each method call, in call order.
-    type Results<E> = [Result<(), E>; 5];
+    type Results<E> = [Result<(), E>; 4];
 
-    /// Calls every method through `HdmiPhy`, as code written against the plain trait does.
-    async fn drive_plain<P: HdmiPhy>(phy: &mut P, eq: EqParams) -> Results<P::Error> {
+    /// Calls every method through `FrlPhy`, as code written against the plain trait does.
+    async fn drive_plain<P: FrlPhy>(phy: &mut P, eq: EqParams) -> Results<P::Error> {
         [
             phy.set_frl_rate(HdmiForumFrl::Rate6Gbps4Lanes).await,
             phy.send_ltp(LanePatterns::default()).await,
             phy.set_frl_output(FrlOutput::GapOnly).await,
             phy.adjust_equalization(eq).await,
-            phy.set_scrambling(true).await,
         ]
     }
 
-    /// Calls every method through `SendHdmiPhy`, as code bounded by the twin does.
-    async fn drive_send<P: SendHdmiPhy>(phy: &mut P) -> Results<P::Error> {
+    /// Calls every method through `SendFrlPhy`, as code bounded by the twin does.
+    async fn drive_send<P: SendFrlPhy>(phy: &mut P) -> Results<P::Error> {
         [
-            SendHdmiPhy::set_frl_rate(phy, HdmiForumFrl::Rate12Gbps4Lanes).await,
-            SendHdmiPhy::send_ltp(phy, LanePatterns::default()).await,
-            SendHdmiPhy::set_frl_output(phy, FrlOutput::Active).await,
-            SendHdmiPhy::adjust_equalization(phy, EqParams::new()).await,
-            SendHdmiPhy::set_scrambling(phy, false).await,
+            SendFrlPhy::set_frl_rate(phy, HdmiForumFrl::Rate12Gbps4Lanes).await,
+            SendFrlPhy::send_ltp(phy, LanePatterns::default()).await,
+            SendFrlPhy::set_frl_output(phy, FrlOutput::Active).await,
+            SendFrlPhy::adjust_equalization(phy, EqParams::new()).await,
         ]
     }
 
-    /// The compiler proves this `Send` bound for every `P: SendHdmiPhy`, not only for the
-    /// mock; with `HdmiPhy` in its place it would not compile.
-    fn spawnable<P: SendHdmiPhy>(
+    /// The compiler proves this `Send` bound for every `P: SendFrlPhy`, not only for the
+    /// mock; with `FrlPhy` in its place it would not compile.
+    fn spawnable<P: SendFrlPhy>(
         phy: &mut P,
     ) -> impl Future<Output = Results<P::Error>> + Send + '_ {
         drive_send(phy)
@@ -519,12 +493,11 @@ mod tests {
         value
     }
 
-    const ALL_CALLS: [Option<&str>; 5] = [
+    const ALL_CALLS: [Option<&str>; 4] = [
         Some("set_frl_rate"),
         Some("send_ltp"),
         Some("set_frl_output"),
         Some("adjust_equalization"),
-        Some("set_scrambling"),
     ];
 
     #[pollster::test]
@@ -532,7 +505,7 @@ mod tests {
         let mut phy = SendMockPhy::default();
         let mut eq = EqParams::new();
         eq.lane2.tx_ffe_level = TxFfeLevel::MAX;
-        assert_eq!(drive_plain(&mut phy, eq).await, [Ok(()); 5]);
+        assert_eq!(drive_plain(&mut phy, eq).await, [Ok(()); 4]);
         assert_eq!(phy.calls, ALL_CALLS);
         assert_eq!(phy.last_eq, Some(eq));
     }
@@ -540,7 +513,7 @@ mod tests {
     #[pollster::test]
     async fn send_twin_futures_are_send_in_generic_code() {
         let mut phy = SendMockPhy::default();
-        assert_eq!(assert_send(spawnable(&mut phy)).await, [Ok(()); 5]);
+        assert_eq!(assert_send(spawnable(&mut phy)).await, [Ok(()); 4]);
         assert_eq!(phy.calls, ALL_CALLS);
     }
 
@@ -570,7 +543,7 @@ mod tests {
     const CONFIG_4K60: TmdsPhyConfig =
         TmdsPhyConfig::new(594_000, TmdsClockRatio::Div40, VIDEO_4K60);
 
-    /// A minimal `TmdsPhy` that records what it is given, as `MockPhy` does for `HdmiPhy`.
+    /// A minimal `TmdsPhy` that records what it is given, as `MockPhy` does for `FrlPhy`.
     #[derive(Default)]
     struct MockTmdsPhy {
         config: Option<TmdsPhyConfig>,

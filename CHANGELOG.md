@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking changes
 
+- **`HdmiPhy` and `SendHdmiPhy` are renamed `FrlPhy` and `SendFrlPhy`**, with no alias, as
+  in hdmi-hal. `set_frl_rate(HdmiForumFrl::NotSupported)` now means "FRL off" and enters no
+  other mode; entering TMDS is `TmdsPhy::configure`'s.
+- **`set_scrambling` moves from `FrlPhy` and `SendFrlPhy` to `TmdsPhy` and `SendTmdsPhy`**,
+  with the same meaning, as in hdmi-hal.
 - **`ScdcTransport::Error` is bounded by `DdcError`, and `SendScdcTransport::Error` by
   `DdcError + Send`**, as in hdmi-hal: every transport error carries a `DdcErrorKind`.
   `DdcError` is implemented for `Infallible`, `()` and `DdcErrorKind`; a transport with its
@@ -16,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A cancellation clause for `FrlPhy` and `SendFrlPhy`**, as the other async traits have:
+  a dropped call may or may not have applied its setting; each method sets a whole state,
+  so calling it again with the state wanted recovers, or the implementation says how to.
 - **`phy::TmdsPhy`, the async TMDS PHY, and its `Send` twin `SendTmdsPhy`**, with
   hdmi-hal's contract: `capabilities` (a plain `fn`), and `async` `configure`,
   `set_scrambling`, `start_output` and `stop_output`. Its cancellation clause: after a
