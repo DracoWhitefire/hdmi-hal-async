@@ -11,11 +11,14 @@ the same shape. See `hdmi-hal`'s
 for the details.
 
 - **PHY traits by link mode (breaking)** — `HdmiPhy` and `SendHdmiPhy` renamed `FrlPhy` and
-  `SendFrlPhy`, with no alias; a new `TmdsPhy` with its `Send` twin `SendTmdsPhy`; the power
-  trait; the clock and delay traits, where the async delay gets a hand-written `Send` twin
-  as the other traits have (generic code bounded by embedded-hal-async's `DelayNs` cannot
-  produce a `Send` future, and that crate has no `Send` twin); a cancellation clause for the
-  PHY traits' futures, matching `ScdcTransport`'s.
+  `SendFrlPhy`, with no alias, and `set_scrambling` moved to a new `TmdsPhy` with its
+  `Send` twin `SendTmdsPhy`; `PhyPower` and `SendPhyPower`; the `time` module, with
+  `hdmi-hal`'s `Timestamp` and `Clock` re-exported and an async `Delay` with a hand-written
+  `Send` twin, `SendDelay`, as the other traits have (generic code bounded by
+  embedded-hal-async's `DelayNs` cannot produce a `Send` future, and that crate has no
+  `Send` twin); a cancellation clause for each, matching `ScdcTransport`'s. On the
+  development branch, described in the [architecture](architecture.md), and being proven by
+  prototypes of the TMDS bring-up procedures before the release fixes them.
 - **`DdcBus` (breaking)** — the async `ddc::DdcBus` with its `Send` twin `SendDdcBus`
   (`Send + Sync`, since its methods take `&self`), the same contract as `hdmi-hal`'s, and
   the cancellation clause `ScdcTransport` has: an implementation stays usable after a dropped
