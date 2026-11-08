@@ -16,6 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`phy::TmdsPhy`, the async TMDS PHY, and its `Send` twin `SendTmdsPhy`**, with
+  hdmi-hal's contract: `capabilities` (a plain `fn`), and `async` `configure`,
+  `set_scrambling`, `start_output` and `stop_output`. Its cancellation clause: after a
+  dropped call the rate and ratio, the scrambler state or whether the output runs are
+  unknown, and `stop_output` then `configure` recover any of them, or the implementation
+  says how. `TmdsClockRatio`, `TmdsPhyConfig`, `TmdsVideo` and `TmdsPhyCapabilities` are
+  re-exported from hdmi-hal, under `phy` and at the crate root.
 - **`ddc` module: the async `DdcBus` and its `Send` twin `SendDdcBus`**, with hdmi-hal's
   contract (`write`, `write_read`, `read` on any 7-bit address, the E-DDC `read_segmented`,
   one call one transaction, shared through `&self`) and the cancellation clause the other

@@ -22,14 +22,15 @@
 
 pub mod ddc;
 
-/// PHY control trait.
+/// PHY control traits.
 pub mod phy;
 
 /// SCDC register transport trait.
 pub mod scdc;
 
 pub use hdmi_hal::phy::{
-    EqParams, FrlOutput, LaneEqParams, LanePatterns, LtpPattern, TxFfeLevel, TxFfeRestrictions,
+    EqParams, FrlOutput, LaneEqParams, LanePatterns, LtpPattern, TmdsClockRatio,
+    TmdsPhyCapabilities, TmdsPhyConfig, TmdsVideo, TxFfeLevel, TxFfeRestrictions,
 };
 
 /// The FRL rate, as `HdmiPhy::set_frl_rate` takes it; re-exported so that implementations

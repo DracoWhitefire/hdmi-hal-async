@@ -2,7 +2,8 @@ use display_types::cea861::hdmi_forum::HdmiForumFrl;
 /// The PHY value types, at the paths `hdmi-hal` gives them (`hdmi_hal::phy::*`). They are
 /// re-exported at the crate root as well.
 pub use hdmi_hal::phy::{
-    EqParams, FrlOutput, LaneEqParams, LanePatterns, LtpPattern, TxFfeLevel, TxFfeRestrictions,
+    EqParams, FrlOutput, LaneEqParams, LanePatterns, LtpPattern, TmdsClockRatio,
+    TmdsPhyCapabilities, TmdsPhyConfig, TmdsVideo, TxFfeLevel, TxFfeRestrictions,
 };
 
 /// Async link-level control of an HDMI 2.1 transmitter PHY.
@@ -130,6 +131,135 @@ impl<T: SendHdmiPhy> HdmiPhy for T {
 
     fn set_scrambling(&mut self, enabled: bool) -> impl Future<Output = Result<(), Self::Error>> {
         <T as SendHdmiPhy>::set_scrambling(self, enabled)
+    }
+}
+
+/// Async TMDS control of an HDMI transmitter PHY.
+///
+/// This is the async counterpart to `hdmi_hal::phy::TmdsPhy`. The trait contract is
+/// identical; only the method signatures gain `async`, except
+/// [`capabilities`](Self::capabilities), a plain report.
+///
+/// What TMDS bring-up and tear-down need from the transmitter, and nothing more: the
+/// character rate and clock ratio, the source's scrambler, and starting and stopping the
+/// output. A trait of its own, so TMDS-only hardware implements nothing of FRL.
+///
+/// Not covered: electrical settings (swing, pre-emphasis, lane mapping), which are the
+/// implementation's; the video pipeline beyond what [`TmdsVideo`] gives the PHY; hotplug and
+/// RX sense; and power.
+///
+/// On a PHY that also implements [`HdmiPhy`], entering one mode leaves the other:
+/// [`configure`](Self::configure) leaves FRL.
+///
+/// # Cancellation
+///
+/// Any of these futures may be dropped before it completes, for example by a deadline in
+/// the caller. What a dropped call has done is then unknown: after a dropped
+/// [`configure`](Self::configure) the rate and ratio are unspecified, after a dropped
+/// [`set_scrambling`](Self::set_scrambling) the scrambler state, and after a dropped
+/// [`start_output`](Self::start_output) or [`stop_output`](Self::stop_output) whether the
+/// output runs.
+///
+/// [`stop_output`](Self::stop_output) and then [`configure`](Self::configure) again recover
+/// from any of them. An implementation that cannot must say so in its documentation: what a
+/// cancelled call leaves behind, and how to recover.
+///
+/// A caller that needs to stop early can avoid the question: check its deadline or cancel
+/// signal before each call and stop there, rather than dropping a future mid-flight.
+pub trait TmdsPhy {
+    /// Error type returned by PHY operations.
+    type Error: core::fmt::Debug;
+
+    /// What the PHY can do. A plain report of what the implementation already knows: not
+    /// `async`, not fallible.
+    fn capabilities(&self) -> TmdsPhyCapabilities;
+
+    /// Set the character rate and clock ratio, with the output stopped, and leave it
+    /// stopped. Enters TMDS mode, leaving FRL on a PHY that also does FRL.
+    ///
+    /// An implementation that cannot reconfigure while transmitting may return an error
+    /// when called with the output running.
+    async fn configure(&mut self, config: TmdsPhyConfig) -> Result<(), Self::Error>;
+
+    /// Turn the source's TMDS scrambler on or off, with the output running or stopped.
+    ///
+    /// `set_scrambling(false)` succeeds on a PHY without a scrambler
+    /// ([`TmdsPhyCapabilities::scrambling`] false), since plain links call it.
+    async fn set_scrambling(&mut self, enabled: bool) -> Result<(), Self::Error>;
+
+    /// Start TMDS output at the configured rate.
+    ///
+    /// Completes once the PHY transmits, after whatever its hardware needs to get there (a
+    /// PLL lock, a reset sequence): callers time from its completion, so completing means on
+    /// the wire.
+    async fn start_output(&mut self) -> Result<(), Self::Error>;
+
+    /// Stop whatever the PHY transmits: TMDS clock and data or, on a PHY still in FRL, FRL
+    /// transmission. Keeps the PHY powered and configured.
+    ///
+    /// Callable in any state, powered off included; stopping a stopped output is not an
+    /// error.
+    async fn stop_output(&mut self) -> Result<(), Self::Error>;
+}
+
+/// [`TmdsPhy`] with `Send` futures, for code that spawns TMDS bring-up on a multi-threaded
+/// executor.
+///
+/// The same methods and contract, cancellation included, each returning a future that is
+/// `Send`, and errors that are `Send` too. Every `SendTmdsPhy` is a `TmdsPhy`, through a
+/// blanket implementation; a type implements one of the two. As with [`SendHdmiPhy`], bound
+/// generic code by `SendTmdsPhy` alone, and with both traits in scope call
+/// `SendTmdsPhy::configure(…)` to avoid an ambiguous method call.
+pub trait SendTmdsPhy: Send {
+    /// Error type returned by PHY operations.
+    type Error: core::fmt::Debug + Send;
+
+    /// See [`TmdsPhy::capabilities`].
+    fn capabilities(&self) -> TmdsPhyCapabilities;
+
+    /// See [`TmdsPhy::configure`].
+    fn configure(
+        &mut self,
+        config: TmdsPhyConfig,
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send;
+
+    /// See [`TmdsPhy::set_scrambling`].
+    fn set_scrambling(
+        &mut self,
+        enabled: bool,
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send;
+
+    /// See [`TmdsPhy::start_output`].
+    fn start_output(&mut self) -> impl Future<Output = Result<(), Self::Error>> + Send;
+
+    /// See [`TmdsPhy::stop_output`].
+    fn stop_output(&mut self) -> impl Future<Output = Result<(), Self::Error>> + Send;
+}
+
+impl<T: SendTmdsPhy> TmdsPhy for T {
+    type Error = <T as SendTmdsPhy>::Error;
+
+    fn capabilities(&self) -> TmdsPhyCapabilities {
+        <T as SendTmdsPhy>::capabilities(self)
+    }
+
+    fn configure(
+        &mut self,
+        config: TmdsPhyConfig,
+    ) -> impl Future<Output = Result<(), Self::Error>> {
+        <T as SendTmdsPhy>::configure(self, config)
+    }
+
+    fn set_scrambling(&mut self, enabled: bool) -> impl Future<Output = Result<(), Self::Error>> {
+        <T as SendTmdsPhy>::set_scrambling(self, enabled)
+    }
+
+    fn start_output(&mut self) -> impl Future<Output = Result<(), Self::Error>> {
+        <T as SendTmdsPhy>::start_output(self)
+    }
+
+    fn stop_output(&mut self) -> impl Future<Output = Result<(), Self::Error>> {
+        <T as SendTmdsPhy>::stop_output(self)
     }
 }
 
@@ -429,5 +559,176 @@ mod tests {
         let restrictions: crate::phy::TxFfeRestrictions =
             hdmi_hal::phy::TxFfeRestrictions::default();
         let _: crate::TxFfeRestrictions = restrictions;
+    }
+
+    const VIDEO_4K60: TmdsVideo = TmdsVideo::new(
+        594_000,
+        display_types::ColorBitDepth::Depth8,
+        display_types::ColorFormat::Rgb444,
+    );
+
+    const CONFIG_4K60: TmdsPhyConfig =
+        TmdsPhyConfig::new(594_000, TmdsClockRatio::Div40, VIDEO_4K60);
+
+    /// A minimal `TmdsPhy` that records what it is given, as `MockPhy` does for `HdmiPhy`.
+    #[derive(Default)]
+    struct MockTmdsPhy {
+        config: Option<TmdsPhyConfig>,
+        scrambling: Option<bool>,
+        output: bool,
+    }
+
+    impl TmdsPhy for MockTmdsPhy {
+        type Error = core::convert::Infallible;
+
+        fn capabilities(&self) -> TmdsPhyCapabilities {
+            TmdsPhyCapabilities::new(600_000).with_scrambling(true)
+        }
+
+        async fn configure(&mut self, config: TmdsPhyConfig) -> Result<(), Self::Error> {
+            self.config = Some(config);
+            Ok(())
+        }
+
+        async fn set_scrambling(&mut self, enabled: bool) -> Result<(), Self::Error> {
+            self.scrambling = Some(enabled);
+            Ok(())
+        }
+
+        async fn start_output(&mut self) -> Result<(), Self::Error> {
+            self.output = true;
+            Ok(())
+        }
+
+        async fn stop_output(&mut self) -> Result<(), Self::Error> {
+            self.output = false;
+            Ok(())
+        }
+    }
+
+    #[pollster::test]
+    async fn tmds_phy_records_configure_scrambling_and_output() {
+        let mut phy = MockTmdsPhy::default();
+        assert!(phy.capabilities().scrambling);
+        phy.stop_output().await.unwrap();
+        phy.configure(CONFIG_4K60).await.unwrap();
+        phy.set_scrambling(true).await.unwrap();
+        phy.start_output().await.unwrap();
+        assert_eq!(phy.config, Some(CONFIG_4K60));
+        assert_eq!(phy.scrambling, Some(true));
+        assert!(phy.output);
+        phy.set_scrambling(false).await.unwrap();
+        phy.stop_output().await.unwrap();
+        assert_eq!(phy.scrambling, Some(false));
+        assert!(!phy.output);
+    }
+
+    /// Implements only the `Send` twin; it records the calls in order.
+    #[derive(Default)]
+    struct SendMockTmdsPhy {
+        calls: [Option<&'static str>; 4],
+        n: usize,
+        config: Option<TmdsPhyConfig>,
+    }
+
+    impl SendMockTmdsPhy {
+        fn record(&mut self, call: &'static str) {
+            self.calls[self.n] = Some(call);
+            self.n += 1;
+        }
+    }
+
+    impl SendTmdsPhy for SendMockTmdsPhy {
+        type Error = core::convert::Infallible;
+
+        fn capabilities(&self) -> TmdsPhyCapabilities {
+            TmdsPhyCapabilities::new(340_000)
+        }
+
+        async fn configure(&mut self, config: TmdsPhyConfig) -> Result<(), Self::Error> {
+            self.record("configure");
+            self.config = Some(config);
+            Ok(())
+        }
+
+        async fn set_scrambling(&mut self, _enabled: bool) -> Result<(), Self::Error> {
+            self.record("set_scrambling");
+            Ok(())
+        }
+
+        async fn start_output(&mut self) -> Result<(), Self::Error> {
+            self.record("start_output");
+            Ok(())
+        }
+
+        async fn stop_output(&mut self) -> Result<(), Self::Error> {
+            self.record("stop_output");
+            Ok(())
+        }
+    }
+
+    type TmdsResults<E> = [Result<(), E>; 4];
+
+    const TMDS_CALLS: [Option<&str>; 4] = [
+        Some("stop_output"),
+        Some("configure"),
+        Some("set_scrambling"),
+        Some("start_output"),
+    ];
+
+    /// Calls every method through `TmdsPhy`, as code written against the plain trait does.
+    async fn bring_up_plain<P: TmdsPhy>(phy: &mut P) -> TmdsResults<P::Error> {
+        let scrambling = phy.capabilities().scrambling;
+        [
+            phy.stop_output().await,
+            phy.configure(CONFIG_4K60).await,
+            phy.set_scrambling(scrambling).await,
+            phy.start_output().await,
+        ]
+    }
+
+    /// Calls every method through `SendTmdsPhy`, as code bounded by the twin does.
+    async fn bring_up_send<P: SendTmdsPhy>(phy: &mut P) -> TmdsResults<P::Error> {
+        let scrambling = SendTmdsPhy::capabilities(phy).scrambling;
+        [
+            SendTmdsPhy::stop_output(phy).await,
+            SendTmdsPhy::configure(phy, CONFIG_4K60).await,
+            SendTmdsPhy::set_scrambling(phy, scrambling).await,
+            SendTmdsPhy::start_output(phy).await,
+        ]
+    }
+
+    /// The compiler proves this `Send` bound for every `P: SendTmdsPhy`.
+    fn spawnable_tmds<P: SendTmdsPhy>(
+        phy: &mut P,
+    ) -> impl Future<Output = TmdsResults<P::Error>> + Send + '_ {
+        bring_up_send(phy)
+    }
+
+    #[pollster::test]
+    async fn send_tmds_twin_is_usable_as_tmds_phy() {
+        let mut phy = SendMockTmdsPhy::default();
+        assert_eq!(bring_up_plain(&mut phy).await, [Ok(()); 4]);
+        assert_eq!(phy.calls, TMDS_CALLS);
+        assert_eq!(phy.config, Some(CONFIG_4K60));
+    }
+
+    #[pollster::test]
+    async fn send_tmds_twin_futures_are_send_in_generic_code() {
+        let mut phy = SendMockTmdsPhy::default();
+        assert_eq!(assert_send(spawnable_tmds(&mut phy)).await, [Ok(()); 4]);
+        assert_eq!(phy.calls, TMDS_CALLS);
+    }
+
+    #[test]
+    fn tmds_value_types_are_hdmi_hals_at_both_paths() {
+        let ratio: crate::phy::TmdsClockRatio = hdmi_hal::phy::TmdsClockRatio::Div10;
+        let _: crate::TmdsClockRatio = ratio;
+        let video: crate::phy::TmdsVideo = VIDEO_4K60;
+        let _: crate::TmdsVideo = video;
+        let config: crate::phy::TmdsPhyConfig = CONFIG_4K60;
+        let _: crate::TmdsPhyConfig = config;
+        let caps: crate::phy::TmdsPhyCapabilities = hdmi_hal::phy::TmdsPhyCapabilities::new(0);
+        let _: crate::TmdsPhyCapabilities = caps;
     }
 }
