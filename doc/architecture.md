@@ -278,7 +278,8 @@ shared through `&'static B` or `Rc<B>`, and a `SendDdcBus` through `&B` or `Arc<
 #### `ScdcOverDdc` and `SendScdcOverDdc`
 
 `scdc::ScdcOverDdc<H>` is the async `ScdcTransport` over a `DdcBus`, with `hdmi-hal`'s
-behaviour: `read` and `read_block` are one `write_read` at 0x54 each, `write` one `write`,
+behaviour: `read` and `read_block` are one `write_read` each at 0x54 (`ddc::SCDC`, whose
+documentation in `hdmi-hal` cites the sources for the address), `write` one `write`,
 its errors are the bus's, and `new` and `bytewise` return the handle when the bus cannot
 serve SCDC.
 
