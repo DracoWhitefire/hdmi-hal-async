@@ -338,9 +338,11 @@ pub trait TmdsPhy {
 
 The contract is `hdmi-hal`'s, restated in the trait documentation: `configure` leaves the
 output stopped, enters TMDS and leaves the scrambler state unspecified; `set_scrambling(false)` succeeds on a PHY without a
-scrambler; `start_output` completes once the PHY transmits, since callers time from its
-completion; `stop_output` is callable in any state and keeps the PHY powered and
-configured.
+scrambler, and `set_scrambling(true)` on one returns an error; `start_output` completes
+once the PHY transmits, since callers time from its completion, and returns an error
+without a successful `configure` since the last power-on; `stop_output` is callable in any
+state and keeps the PHY powered and configured. `configure` with the output running either
+returns an error or stops it first, and on a powered-off PHY returns an error.
 
 **Cancellation.** After a dropped `configure` the rate and ratio are unspecified, after a
 dropped `set_scrambling` the scrambler state, after a dropped `start_output` or
