@@ -66,7 +66,9 @@ pub trait FrlPhy {
     /// data islands and control periods.
     async fn set_frl_output(&mut self, output: FrlOutput) -> Result<(), Self::Error>;
 
-    /// Adjust equalization parameters after link training feedback.
+    /// Apply equalization: each lane's TxFFE level, within the link-wide
+    /// [`TxFfeRestrictions`] in `params`. Each call carries the complete settings, so the
+    /// restrictions in force are always the last ones given.
     async fn adjust_equalization(&mut self, params: EqParams) -> Result<(), Self::Error>;
 }
 
