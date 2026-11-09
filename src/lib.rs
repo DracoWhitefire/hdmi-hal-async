@@ -36,6 +36,10 @@ pub use hdmi_hal::phy::{
     TmdsPhyCapabilities, TmdsPhyConfig, TmdsVideo, TxFfeLevel, TxFfeRestrictions,
 };
 
+/// The colour depth and format `phy::TmdsVideo` carries; re-exported from `display-types`
+/// so that implementations name the same types this crate does.
+pub use display_types::{ColorBitDepth, ColorFormat};
+
 /// The FRL rate, as `phy::FrlPhy::set_frl_rate` takes it; re-exported so that implementations
 /// name the same type this crate does.
 pub use hdmi_hal::HdmiForumFrl;

@@ -6,6 +6,10 @@ pub use hdmi_hal::phy::{
     TmdsPhyCapabilities, TmdsPhyConfig, TmdsVideo, TxFfeLevel, TxFfeRestrictions,
 };
 
+/// The colour depth and format [`TmdsVideo`] carries, re-exported from `display-types` (as
+/// `hdmi_hal::phy` does) so that implementations need no direct dependency.
+pub use display_types::{ColorBitDepth, ColorFormat};
+
 /// Async FRL control of an HDMI 2.1 transmitter PHY.
 ///
 /// This is the async counterpart to `hdmi_hal::phy::FrlPhy`. The trait contract is
@@ -781,6 +785,14 @@ mod tests {
         let mut phy = SendMockTmdsPhy::default();
         assert_eq!(assert_send(spawnable_tmds(&mut phy)).await, [Ok(()); 4]);
         assert_eq!(phy.calls, TMDS_CALLS);
+    }
+
+    #[test]
+    fn colour_types_are_display_types_at_both_paths() {
+        let depth: crate::phy::ColorBitDepth = display_types::ColorBitDepth::Depth10;
+        let _: crate::ColorBitDepth = depth;
+        let format: crate::phy::ColorFormat = display_types::ColorFormat::YCbCr420;
+        let _: crate::ColorFormat = format;
     }
 
     #[test]

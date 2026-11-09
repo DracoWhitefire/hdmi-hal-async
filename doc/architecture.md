@@ -436,6 +436,10 @@ pub use hdmi_hal::ddc::{
 Code moving between the sync and async traits can keep its `ddc::`, `phy::` and `time::`
 imports.
 
+`ColorBitDepth` and `ColorFormat`, which `TmdsVideo` carries, are re-exported from
+`display-types` under `phy` and at the crate root, as in `hdmi-hal`, so a `TmdsPhy`
+implementation needs no direct `display-types` dependency.
+
 `HdmiForumFrl`, which `FrlPhy::set_frl_rate` takes, is re-exported at the crate root as
 well (`hdmi_hal_async::HdmiForumFrl`, from `hdmi-hal`), so a PHY implementation needs no
 direct `display-types` dependency to name it.

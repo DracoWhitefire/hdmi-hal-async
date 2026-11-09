@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`ColorBitDepth` and `ColorFormat` re-exported** from display-types, under `phy` and at
+  the crate root, as in hdmi-hal: `TmdsVideo` uses them, so a `TmdsPhy` implementation
+  needs no direct display-types dependency.
 - **`time` module: the async `Delay` and its `Send` twin `SendDelay`**, with hdmi-hal's
   contract (wait at least the duration given; infallible), and hdmi-hal's `Timestamp` and
   `Clock` re-exported: reading a clock does not wait, so it stays neither `async` nor
