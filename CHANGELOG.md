@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`HdmiPhy` and `SendHdmiPhy` are renamed `FrlPhy` and `SendFrlPhy`**, with no alias, as
   in hdmi-hal. `set_frl_rate(HdmiForumFrl::NotSupported)` now means "FRL off" and enters no
-  other mode; entering TMDS is `TmdsPhy::configure`'s.
+  other mode; entering TMDS is `TmdsPhy::configure`'s. `FrlPhy::Error` is bounded by
+  `core::fmt::Debug` and `SendFrlPhy::Error` by `Debug + Send`, as for the other PHY traits.
 - **`set_scrambling` moves from `FrlPhy` and `SendFrlPhy` to `TmdsPhy` and `SendTmdsPhy`**,
   with the same meaning, as in hdmi-hal.
 - **`ScdcTransport::Error` is bounded by `DdcError`, and `SendScdcTransport::Error` by

@@ -60,7 +60,7 @@ generates, written by hand (no dependency):
 
 ```rust
 pub trait SendFrlPhy: Send {
-    type Error: Send;
+    type Error: core::fmt::Debug + Send;
     fn set_frl_rate(&mut self, rate: HdmiForumFrl)
         -> impl Future<Output = Result<(), Self::Error>> + Send;
     // … one per method
@@ -79,8 +79,9 @@ impl<T: SendFrlPhy> FrlPhy for T {
 - **Implementations write `async fn`**; the compiler checks that each future is `Send`.
 - **`type Error: Send`**, unlike `trait_variant`: every user of a twin spawns, and a
   spawned task returns the errors, so the bound would otherwise be repeated by every
-  caller (`P::Error: Send`). Where the plain trait bounds its error (`TmdsPhy`'s and
-  `PhyPower`'s `Debug`), the twin adds `Send` to that bound. `SendDelay` has no error.
+  caller (`P::Error: Send`). Where the plain trait bounds its error (the PHY traits'
+  `Debug`, `DdcBus`'s and `ScdcTransport`'s `DdcError`), the twin adds `Send` to that
+  bound. `SendDelay` has no error.
 - **Plain reports stay plain functions** in the twin too: `SendTmdsPhy::capabilities` is a
   `fn`, forwarded by the blanket implementation.
 - **`SendScdcTransport: Send + Sync`** and **`SendDdcBus: Send + Sync`**: `read` (every
@@ -299,7 +300,7 @@ and `HdmiForumFrl::NotSupported` turns FRL off and enters no other mode, as
 
 ```rust
 pub trait FrlPhy {
-    type Error;
+    type Error: core::fmt::Debug;
 
     async fn set_frl_rate(&mut self, rate: HdmiForumFrl) -> Result<(), Self::Error>;
     async fn send_ltp(&mut self, patterns: LanePatterns) -> Result<(), Self::Error>;

@@ -38,8 +38,9 @@ pub use hdmi_hal::phy::{
 /// A caller that needs to stop early can avoid the question: check its deadline or cancel
 /// signal before each call and stop there, rather than dropping a future mid-flight.
 pub trait FrlPhy {
-    /// Error type returned by PHY operations.
-    type Error;
+    /// Error type returned by PHY operations; `Debug`, as the other PHY traits' errors are,
+    /// so generic code can format it.
+    type Error: core::fmt::Debug;
 
     /// Select the FRL rate, or turn FRL off. Triggers the required lane reconfiguration
     /// sequence.
@@ -87,7 +88,7 @@ pub trait FrlPhy {
 /// the futures are no longer known to be `Send`.
 pub trait SendFrlPhy: Send {
     /// Error type returned by PHY operations.
-    type Error: Send;
+    type Error: core::fmt::Debug + Send;
 
     /// See [`FrlPhy::set_frl_rate`].
     fn set_frl_rate(
