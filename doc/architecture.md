@@ -396,6 +396,11 @@ generic code bounded by `DelayNs` cannot produce a `Send` future, and that crate
 `SendDelay` is the twin. An implementation over a `DelayNs` is a few lines, shown in the
 module documentation; no adapter type ships, which would add a dependency.
 
+**No forwarding implementations** for references, as for `DdcBus`: a `Delay` for `&mut D`
+would conflict with `SendDelay`'s blanket implementation (E0119), and `hdmi-hal`'s `Clock`
+and `Delay` keep the same shape. An implementation that wants to be shared implements the
+traits for a reference to its own type.
+
 **Cancellation.** A dropped delay has done nothing that needs undoing, so a caller may
 race a delay against an event.
 

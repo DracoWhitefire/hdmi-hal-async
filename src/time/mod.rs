@@ -11,6 +11,12 @@
 //! bounds on both; a test double may implement both on one type, advancing its clock by each
 //! delay.
 //!
+//! Neither trait has a forwarding implementation for references, as
+//! [`DdcBus`](crate::ddc::DdcBus) has none: `impl<D: Delay> Delay for &mut D` would conflict
+//! with [`SendDelay`]'s blanket implementation (E0119), since another crate may implement
+//! `SendDelay` for a reference to its own type, and hdmi-hal's traits keep the same shape. An
+//! implementation may implement either trait for a reference to its own type.
+//!
 //! # Over embedded-hal-async
 //!
 //! [`Delay`] is the stack's own trait rather than a bound on embedded-hal-async's `DelayNs`:
