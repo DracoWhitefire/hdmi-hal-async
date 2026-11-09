@@ -61,7 +61,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   type cannot implement both traits). Both hold any handle that dereferences to the bus and
   return it from `new` and `bytewise` when the bus cannot serve SCDC.
 - The crate's scope, as its docs now say: traits and the glue between its own traits; no
-  hardware or platform implementations, no policy, no clocks.
+  hardware, platform or clock implementations, no policy. The `time` module's `Delay` is a
+  trait, implemented by the platform.
 
 ### Internal
 
