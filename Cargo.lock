@@ -35,7 +35,7 @@ dependencies = [
 [[package]]
 name = "hdmi-hal"
 version = "0.6.1"
-source = "git+https://github.com/ashlar-display/hdmi-hal?branch=feat%2Ftmds-phy#41430a97028983c0c9370a3f1c8cf8be212e8735"
+source = "git+https://github.com/ashlar-display/hdmi-hal?rev=41430a97028983c0c9370a3f1c8cf8be212e8735#41430a97028983c0c9370a3f1c8cf8be212e8735"
 dependencies = [
  "display-types",
 ]
