@@ -171,8 +171,9 @@ impl<T: SendFrlPhy> FrlPhy for T {
 /// [`start_output`](Self::start_output) or [`stop_output`](Self::stop_output) whether the
 /// output runs.
 ///
-/// [`stop_output`](Self::stop_output) and then [`configure`](Self::configure) again recover
-/// from any of them. An implementation that cannot must say so in its documentation: what a
+/// [`stop_output`](Self::stop_output), [`configure`](Self::configure) and then
+/// [`set_scrambling`](Self::set_scrambling) recover from any of them: `configure` leaves the
+/// scrambler state unspecified, so the scrambler is set again after it. An implementation that cannot must say so in its documentation: what a
 /// cancelled call leaves behind, and how to recover.
 ///
 /// A caller that needs to stop early can avoid the question: check its deadline or cancel
@@ -190,6 +191,10 @@ pub trait TmdsPhy {
     ///
     /// An implementation that cannot reconfigure while transmitting may return an error
     /// when called with the output running.
+    ///
+    /// The scrambler state afterwards is unspecified: an implementation may keep it, reset
+    /// it or set it from the rate. Callers set it with
+    /// [`set_scrambling`](Self::set_scrambling) after `configure`.
     async fn configure(&mut self, config: TmdsPhyConfig) -> Result<(), Self::Error>;
 
     /// Turn the source's TMDS scrambler on or off, with the output running or stopped.
