@@ -5,6 +5,11 @@
 //! hdmi-hal's, re-exported: reading a counter does not wait, so the clock is neither `async`
 //! nor fallible in either crate. [`Delay`] is async, and has a `Send` twin, [`SendDelay`].
 //!
+//! `Clock` has no twin, since `now` is not `async`, but code that holds a clock across an
+//! `.await` in a task spawned on a multi-threaded executor bounds it `C: Clock + Sync`: a
+//! future holding `&C` is `Send` only when `C` is `Sync`. A clock with state then keeps it in
+//! an atomic or a lock, not a `Cell`.
+//!
 //! Two traits, not one: the clock is read where nothing waits (stamping an event, checking a
 //! deadline), the delay is `async` while the clock is not, and a platform may take them from
 //! different peripherals, a free-running counter and a timer. A procedure that needs both

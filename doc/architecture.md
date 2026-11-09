@@ -87,7 +87,8 @@ impl<T: SendFrlPhy> FrlPhy for T {
 - **`SendScdcTransport: Send + Sync`** and **`SendDdcBus: Send + Sync`**: `read` (every
   method, for the bus) takes `&self`, and a future holding `&self` is only `Send` when the
   type is `Sync`. Interior state therefore needs a `Sync` type (an atomic or a lock, not a
-  `Cell`).
+  `Cell`). The same holds for a `time::Clock` used by spawned code: it has no twin (`now`
+  is not `async`), so such code bounds `C: Clock + Sync`.
 - **`read_block`**: required in both traits, and the blanket implementation forwards it, so
   a twin's `read_block` is used through either trait. `read_block_bytewise` serves both: a
   twin implementation is an `ScdcTransport` through the blanket implementation, and the
