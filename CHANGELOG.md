@@ -66,6 +66,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Internal
 
+- CI fails on `main`, and the publish workflow's verify job fails, when `Cargo.toml` has a
+  `[patch]` section: the prototype patches hdmi-hal to an unreleased commit, and
+  `cargo package` drops `[patch]`, so a release made with it would not build.
 - `embedded-hal-async` 1.0 is a dev-dependency, for the `time` module's documentation
   example of a `Delay` over `DelayNs`; it does not reach users.
 
