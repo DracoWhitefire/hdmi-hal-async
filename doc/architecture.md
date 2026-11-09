@@ -420,8 +420,10 @@ race a delay against an event.
 
 **Not covered yet.** As in `hdmi-hal`, the PHY surface is what link training and TMDS
 bring-up need. Lane mapping, TMDS pre-emphasis and swing, spread-spectrum clocking and
-power states beyond off and on are planned for when the mode-setting layer needs them.
-They are added to `hdmi-hal` first and mirrored here in the same release;
+power states beyond off and on are planned for when the mode-setting layer needs them,
+including whether each belongs in the traits or in a backend's own configuration (TMDS swing
+and pre-emphasis are the implementation's today, outside `TmdsPhy`). Trait additions go to
+`hdmi-hal` first and mirrored here in the same release;
 `doc/roadmap.md` tracks them.
 
 ---

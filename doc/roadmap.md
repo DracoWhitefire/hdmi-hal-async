@@ -33,6 +33,7 @@ for the details.
   `DdcCapabilities`, as for the PHY types.
 - **Further PHY configuration** — lane mapping, TMDS pre-emphasis and swing,
   spread-spectrum clocking and power states beyond off and on, each decided when the layer
-  that needs it is built. As trait methods with default implementations they are not
+  that needs it is built, in the traits or in a backend's own configuration (TMDS swing and
+  pre-emphasis are the implementation's today, outside `TmdsPhy`). As trait methods with default implementations they are not
   breaking changes; as required methods they would be.
 - **CEC traits** — message-level and bit-level, when CEC work begins.
