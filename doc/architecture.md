@@ -395,7 +395,10 @@ pub trait Delay {
 generic code bounded by `DelayNs` cannot produce a `Send` future, and that crate has no
 `Send` twin, so a procedure spawned on a multi-threaded executor could not use it.
 `SendDelay` is the twin. An implementation over a `DelayNs` is a few lines, shown in the
-module documentation; no adapter type ships, which would add a dependency.
+module documentation; no adapter type ships, which would add a dependency. A `SendDelay`
+cannot be written generically over `DelayNs`, whose futures are not known to be `Send`; it
+is implemented over a concrete timer whose future is (embassy-time's timer, tokio's
+`sleep`).
 
 **No forwarding implementations** for references, as for `DdcBus`: a `Delay` for `&mut D`
 would conflict with `SendDelay`'s blanket implementation (E0119), and `hdmi-hal`'s `Clock`

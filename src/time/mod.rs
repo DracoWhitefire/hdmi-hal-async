@@ -47,6 +47,12 @@
 //!     }
 //! }
 //! ```
+//!
+//! That covers the plain [`Delay`]. A [`SendDelay`] cannot be written generically over
+//! `DelayNs`: its futures are not known to be `Send`, which is why the twin exists. A
+//! `SendDelay` is implemented over a concrete timer whose future is `Send` (embassy-time's
+//! timer, tokio's `sleep`), and a wrapper that implements `Delay` generically cannot also
+//! implement `SendDelay` for one concrete timer (E0119).
 
 use core::time::Duration;
 
