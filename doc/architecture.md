@@ -375,6 +375,12 @@ pub trait PhyPower {
 **Cancellation.** After a dropped call the power state is unknown; `power_off` again
 recovers, since it is callable in any state.
 
+**One type, several traits.** Generic code bounded by `TmdsPhy + PhyPower` names the error
+through one trait and ties the other to it (`PhyPower<Error = <P as TmdsPhy>::Error>`), as
+`PhyPower`'s documentation shows. A type implementing both `TmdsPhy` and `DdcBus` has two
+`capabilities` methods, so with both traits in scope the call is qualified
+(`TmdsPhy::capabilities(&p)`); one value rarely serves as both, so the names are kept.
+
 ### `time::Delay`
 
 Async version of `hdmi_hal::time::Delay`: wait at least the duration given, rounding up to
