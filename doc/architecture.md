@@ -403,7 +403,11 @@ is implemented over a concrete timer whose future is (embassy-time's timer, toki
 **No forwarding implementations** for references, as for `DdcBus`: a `Delay` for `&mut D`
 would conflict with `SendDelay`'s blanket implementation (E0119), and `hdmi-hal`'s `Clock`
 and `Delay` keep the same shape. An implementation that wants to be shared implements the
-traits for a reference to its own type.
+traits for a reference to its own type. That is how one test double serves as clock and
+delay when a procedure takes them as separate arguments (`&C` and `&mut D`): it keeps its
+time in a `Cell` (an atomic for `Send` code) and implements `Delay` for `&Double`. Whether
+the procedures take one value or two is settled with their types, in the TMDS bring-up
+prototype.
 
 **Cancellation.** A dropped delay has done nothing that needs undoing, so a caller may
 race a delay against an event.

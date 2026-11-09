@@ -22,6 +22,11 @@
 //! `SendDelay` for a reference to its own type, and hdmi-hal's traits keep the same shape. An
 //! implementation may implement either trait for a reference to its own type.
 //!
+//! That is also how one test double serves as both when a procedure takes the clock (`&C`)
+//! and the delay (`&mut D`) as separate arguments: the double keeps its time in a `Cell` (or
+//! an atomic, for `Send` code) and implements `Clock` for itself and `Delay` (or
+//! `SendDelay`) for `&Double`, so `&double` and `&mut &double` can be passed at once.
+//!
 //! # Over embedded-hal-async
 //!
 //! [`Delay`] is the stack's own trait rather than a bound on embedded-hal-async's `DelayNs`:
