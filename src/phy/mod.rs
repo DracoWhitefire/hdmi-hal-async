@@ -958,4 +958,170 @@ mod tests {
         assert_eq!(assert_send(spawnable_power(&mut phy)).await, [Ok(()); 2]);
         assert_eq!((phy.on, phy.off), (1, 1));
     }
+
+    /// One PHY implementing the three `Send` twins with one error type, and a clock and
+    /// delay on one `Sync` type: everything a TMDS fallback after FRL training needs.
+    #[derive(Default)]
+    struct SendFullPhy {
+        frl: Option<HdmiForumFrl>,
+        tmds: bool,
+        powered: bool,
+        calls: u32,
+    }
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct PhyError;
+
+    impl SendFrlPhy for SendFullPhy {
+        type Error = PhyError;
+
+        async fn set_frl_rate(&mut self, rate: HdmiForumFrl) -> Result<(), PhyError> {
+            self.calls += 1;
+            self.frl = match rate {
+                HdmiForumFrl::NotSupported => None,
+                rate => Some(rate),
+            };
+            self.tmds = false;
+            Ok(())
+        }
+
+        async fn send_ltp(&mut self, _patterns: LanePatterns) -> Result<(), PhyError> {
+            self.calls += 1;
+            Ok(())
+        }
+
+        async fn set_frl_output(&mut self, _output: FrlOutput) -> Result<(), PhyError> {
+            self.calls += 1;
+            Ok(())
+        }
+
+        async fn adjust_equalization(&mut self, _params: EqParams) -> Result<(), PhyError> {
+            self.calls += 1;
+            Ok(())
+        }
+    }
+
+    impl SendTmdsPhy for SendFullPhy {
+        type Error = PhyError;
+
+        fn capabilities(&self) -> TmdsPhyCapabilities {
+            TmdsPhyCapabilities::new(600_000).with_scrambling(true)
+        }
+
+        async fn configure(&mut self, _config: TmdsPhyConfig) -> Result<(), PhyError> {
+            self.calls += 1;
+            if !self.powered {
+                return Err(PhyError);
+            }
+            self.frl = None;
+            self.tmds = true;
+            Ok(())
+        }
+
+        async fn set_scrambling(&mut self, _enabled: bool) -> Result<(), PhyError> {
+            self.calls += 1;
+            Ok(())
+        }
+
+        async fn start_output(&mut self) -> Result<(), PhyError> {
+            self.calls += 1;
+            Ok(())
+        }
+
+        async fn stop_output(&mut self) -> Result<(), PhyError> {
+            self.calls += 1;
+            self.frl = None;
+            Ok(())
+        }
+    }
+
+    impl SendPhyPower for SendFullPhy {
+        type Error = PhyError;
+
+        async fn power_on(&mut self) -> Result<(), PhyError> {
+            self.powered = true;
+            Ok(())
+        }
+
+        async fn power_off(&mut self) -> Result<(), PhyError> {
+            self.powered = false;
+            self.frl = None;
+            self.tmds = false;
+            Ok(())
+        }
+    }
+
+    /// A clock and delay on one `Sync` type: the delay advances the clock.
+    #[derive(Default)]
+    struct SendTime {
+        now_us: core::sync::atomic::AtomicU64,
+    }
+
+    impl crate::time::Clock for SendTime {
+        fn now(&self) -> crate::time::Timestamp {
+            crate::time::Timestamp::from_micros(
+                self.now_us.load(core::sync::atomic::Ordering::Relaxed),
+            )
+        }
+    }
+
+    impl crate::time::SendDelay for &SendTime {
+        async fn delay(&mut self, duration: core::time::Duration) {
+            let us = duration.as_nanos().div_ceil(1_000) as u64;
+            self.now_us
+                .fetch_add(us, core::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
+    /// Generic over all three PHY twins, the delay twin and a `Sync` clock, with one error
+    /// type: the future must be `Send` for every such type, not only for the mocks.
+    // Spelled out rather than `async fn`, so the `Send` bound on the future is the test.
+    #[allow(clippy::manual_async_fn)]
+    fn spawnable_fallback<'a, P, C, D>(
+        phy: &'a mut P,
+        clock: &'a C,
+        mut delay: D,
+    ) -> impl Future<Output = Result<u64, <P as SendTmdsPhy>::Error>> + Send + 'a
+    where
+        P: SendTmdsPhy
+            + SendFrlPhy<Error = <P as SendTmdsPhy>::Error>
+            + SendPhyPower<Error = <P as SendTmdsPhy>::Error>,
+        C: crate::time::Clock + Sync,
+        D: crate::time::SendDelay + 'a,
+    {
+        async move {
+            SendPhyPower::power_on(phy).await?;
+            SendFrlPhy::set_frl_rate(phy, HdmiForumFrl::Rate6Gbps4Lanes).await?;
+            SendFrlPhy::send_ltp(phy, LanePatterns::default()).await?;
+            SendFrlPhy::adjust_equalization(phy, EqParams::new()).await?;
+            SendFrlPhy::set_frl_output(phy, FrlOutput::GapOnly).await?;
+            SendFrlPhy::set_frl_rate(phy, HdmiForumFrl::NotSupported).await?;
+            let start = clock.now();
+            SendTmdsPhy::stop_output(phy).await?;
+            SendTmdsPhy::configure(phy, CONFIG_4K60).await?;
+            let scrambling = SendTmdsPhy::capabilities(phy).scrambling;
+            SendTmdsPhy::set_scrambling(phy, scrambling).await?;
+            crate::time::SendDelay::delay(&mut delay, core::time::Duration::from_millis(1)).await;
+            SendTmdsPhy::start_output(phy).await?;
+            Ok(clock.now().saturating_duration_since(start).as_micros() as u64)
+        }
+    }
+
+    #[pollster::test]
+    async fn send_twins_and_time_compose_into_a_send_future() {
+        let mut phy = SendFullPhy::default();
+        let time = SendTime::default();
+        let waited = assert_send(spawnable_fallback(&mut phy, &time, &time))
+            .await
+            .unwrap();
+        assert_eq!(waited, 1_000);
+        assert!(phy.powered && phy.tmds && phy.frl.is_none());
+        assert_eq!(phy.calls, 9);
+        // The blanket implementations give the plain traits on the same type.
+        assert_eq!(PhyPower::power_off(&mut phy).await, Ok(()));
+        assert_eq!(
+            TmdsPhy::configure(&mut phy, CONFIG_4K60).await,
+            Err(PhyError)
+        );
+    }
 }
