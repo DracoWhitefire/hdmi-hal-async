@@ -827,13 +827,17 @@ mod tests {
         }
     }
 
-    /// A caller that powers the PHY bounds on both traits.
+    /// A caller that powers the PHY bounds on both traits; it drives every `TmdsPhy` method,
+    /// so the forwarding to the inner mock is checked too.
     async fn power_cycle<P: PhyPower + TmdsPhy>(phy: &mut P) {
         PhyPower::power_off(phy).await.unwrap();
         PhyPower::power_off(phy).await.unwrap();
         PhyPower::power_on(phy).await.unwrap();
         PhyPower::power_on(phy).await.unwrap();
+        TmdsPhy::stop_output(phy).await.unwrap();
         TmdsPhy::configure(phy, CONFIG_4K60).await.unwrap();
+        let scrambling = TmdsPhy::capabilities(phy).scrambling;
+        TmdsPhy::set_scrambling(phy, scrambling).await.unwrap();
         TmdsPhy::start_output(phy).await.unwrap();
     }
 
@@ -849,6 +853,7 @@ mod tests {
         power_cycle(&mut phy).await;
         assert!(phy.powered && phy.tmds.output);
         assert_eq!(phy.tmds.config, Some(CONFIG_4K60));
+        assert_eq!(phy.tmds.scrambling, Some(true));
         phy.power_off().await.unwrap();
         assert!(!phy.powered && !phy.tmds.output);
         assert_eq!(phy.tmds.config, None);
