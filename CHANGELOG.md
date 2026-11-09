@@ -63,6 +63,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The crate's scope, as its docs now say: traits and the glue between its own traits; no
   hardware or platform implementations, no policy, no clocks.
 
+### Internal
+
+- `embedded-hal-async` 1.0 is a dev-dependency, for the `time` module's documentation
+  example of a `Delay` over `DelayNs`; it does not reach users.
+
 ## [0.3.1] - 2026-11-03
 
 ### Changed
