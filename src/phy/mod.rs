@@ -21,7 +21,8 @@ pub use hdmi_hal::phy::{
 /// Vendor-specific register sequences are an implementation detail of each backend.
 ///
 /// On a PHY that also implements [`TmdsPhy`], entering one mode leaves the other:
-/// [`set_frl_rate`](Self::set_frl_rate) with a rate leaves TMDS.
+/// [`set_frl_rate`](Self::set_frl_rate) with a rate leaves TMDS. [`TmdsPhy::stop_output`]
+/// on a PHY in FRL leaves FRL, as `set_frl_rate(NotSupported)` does.
 ///
 /// # Cancellation
 ///
@@ -217,8 +218,9 @@ pub trait TmdsPhy {
     async fn start_output(&mut self) -> Result<(), Self::Error>;
 
     /// Stop whatever the PHY transmits: TMDS clock and data or, on a PHY still in FRL, FRL
-    /// transmission. Keeps the PHY powered and configured, unlike
-    /// [`PhyPower::power_off`].
+    /// transmission. Keeps the PHY powered and its TMDS configuration, unlike
+    /// [`PhyPower::power_off`]. A PHY in FRL leaves FRL, as
+    /// [`FrlPhy::set_frl_rate`]`(NotSupported)` does, since nothing here can resume it.
     ///
     /// Callable in any state, powered off included; stopping a stopped output is not an
     /// error.
@@ -299,7 +301,8 @@ impl<T: SendTmdsPhy> TmdsPhy for T {
 ///
 /// For a PHY implementing both mode traits, entering one mode leaves the other:
 /// [`TmdsPhy::configure`] leaves FRL, and [`FrlPhy::set_frl_rate`] with a rate leaves TMDS;
-/// `set_frl_rate(NotSupported)` turns FRL off and enters nothing.
+/// `set_frl_rate(NotSupported)` turns FRL off and enters nothing, as
+/// [`TmdsPhy::stop_output`] on a PHY in FRL does.
 ///
 /// # Cancellation
 ///
@@ -317,8 +320,8 @@ pub trait PhyPower {
     /// Power the PHY on, leaving the output stopped and no mode entered; the caller then
     /// enters one, with [`TmdsPhy::configure`] or [`FrlPhy::set_frl_rate`].
     ///
-    /// Powering on a PHY that is on is not an error, and does not change a mode already
-    /// entered.
+    /// On a PHY that is already on it does nothing: it is not an error, and neither the
+    /// mode nor the output changes.
     async fn power_on(&mut self) -> Result<(), Self::Error>;
 
     /// Power the PHY off: stop any output and leave no mode. Afterwards the PHY holds no

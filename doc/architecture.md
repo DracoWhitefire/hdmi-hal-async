@@ -294,7 +294,8 @@ type); `SendScdcOverDdc` where code is bounded by the twins.
 
 Async version of `hdmi_hal::phy::FrlPhy`. Same methods, same parameter types, same
 semantics: `set_frl_rate` with a rate enters FRL (leaving TMDS on a PHY that does both),
-and `HdmiForumFrl::NotSupported` turns FRL off and enters no other mode.
+and `HdmiForumFrl::NotSupported` turns FRL off and enters no other mode, as
+`TmdsPhy::stop_output` on a PHY in FRL does.
 
 ```rust
 pub trait FrlPhy {
@@ -341,7 +342,8 @@ output stopped, enters TMDS and leaves the scrambler state unspecified; `set_scr
 scrambler, and `set_scrambling(true)` on one returns an error; `start_output` completes
 once the PHY transmits, since callers time from its completion, and returns an error
 without a successful `configure` since the last power-on; `stop_output` is callable in any
-state and keeps the PHY powered and configured. `configure` with the output running either
+state, keeps the PHY powered and its TMDS configuration, and on a PHY in FRL leaves FRL.
+`configure` with the output running either
 returns an error or stops it first, and on a powered-off PHY returns an error.
 
 **Cancellation.** After a dropped `configure` the rate and ratio are unspecified, after a
@@ -354,7 +356,8 @@ set again after it); an implementation that cannot says so.
 
 Async version of `hdmi_hal::phy::PhyPower`, shared by both mode traits: `power_on` leaves
 the output stopped and no mode entered, `power_off` leaves no mode, so a bring-up configures
-again; both are callable in any state. A trait of its own rather than a supertrait, so link
+again; both are callable in any state, and `power_on` on a PHY that is already on does
+nothing. A trait of its own rather than a supertrait, so link
 training and TMDS bring-up never need it and a PHY that is always on implements the mode
 traits only.
 
