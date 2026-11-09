@@ -377,7 +377,8 @@ recovers, since it is callable in any state.
 ### `time::Delay`
 
 Async version of `hdmi_hal::time::Delay`: wait at least the duration given, rounding up to
-the implementation's tick, never less; infallible. `Clock` and `Timestamp` are
+the implementation's tick, never less, measured on the platform's `Clock` (`now()` after
+`delay(d)` completes is at least `d` later than before it); infallible. `Clock` and `Timestamp` are
 `hdmi-hal`'s, re-exported unchanged: reading a counter does not wait, so the clock is
 neither `async` nor fallible in either crate, and one type serves sync and async code.
 
