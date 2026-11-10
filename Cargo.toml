@@ -23,4 +23,4 @@ embedded-hal-async = "1.0"
 # commit of its feat/tmds-phy branch, moved by hand. Removed when hdmi-hal is released; CI
 # on main and the publish workflow fail while it is here.
 [patch.crates-io]
-hdmi-hal = { git = "https://github.com/ashlar-display/hdmi-hal", rev = "35131adfe65067620e004665f6e2a88a4dbd6fb9" }
+hdmi-hal = { git = "https://github.com/ashlar-display/hdmi-hal", rev = "29754ce9ec60c54f86170ebd43729e7fbaee043f" }

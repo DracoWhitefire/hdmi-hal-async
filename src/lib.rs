@@ -21,6 +21,13 @@
 // (SendFrlPhy, SendTmdsPhy, SendPhyPower, SendScdcTransport, SendDdcBus, SendDelay) are for multi-threaded executors.
 #![allow(async_fn_in_trait)]
 
+/// A flag that asks a procedure to stop, re-exported from `hdmi-hal`: `is_cancelled` is not
+/// `async`, so the sync trait serves async procedures as it is. A flag shared with a task
+/// on a multi-threaded executor is `Sync`, as `AtomicBool` is.
+pub mod cancel {
+    pub use hdmi_hal::cancel::{Cancel, NoCancel};
+}
+
 pub mod ddc;
 
 /// PHY control traits.

@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`cancel::Cancel` and `NoCancel`**, re-exported from hdmi-hal: the flag that asks a
+  procedure to stop between its calls, the same for sync and async procedures, since
+  reading it does not wait.
 - **`ColorBitDepth` and `ColorFormat` re-exported** from display-types, under `phy` and at
   the crate root, as in hdmi-hal: `TmdsVideo` uses them, so a `TmdsPhy` implementation
   needs no direct display-types dependency.
