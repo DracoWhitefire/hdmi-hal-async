@@ -50,6 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`CONTRIBUTING.md` matches the CI checks** (clippy over all targets, rustdoc with
   `-D warnings`, the tests, the bare-metal build, the MSRV and coverage), and its
   publishing section says that hdmi-hal-async re-exports hdmi-hal's value types.
+- **The README's documentation list links `doc/setup.md`, `doc/testing.md` and
+  `CONTRIBUTING.md`.**
 
 ## [0.3.1] - 2026-11-03
 

@@ -144,7 +144,10 @@ flowchart LR
 ## Documentation
 
 - [`doc/architecture.md`](doc/architecture.md) — trait surfaces, design principles, and async/sync split
+- [`doc/setup.md`](doc/setup.md) — build, test, `no_std`, MSRV and coverage commands
+- [`doc/testing.md`](doc/testing.md) — what the tests check and how CI runs them
 - [`doc/roadmap.md`](doc/roadmap.md) — planned features and future work
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — how to contribute, and trait stability
 
 ## Verifying releases
 
