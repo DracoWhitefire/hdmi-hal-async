@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Internal
+
+- **The README's Rust examples run as doctests** (`ReadmeDoctests` in `lib.rs`, compiled
+  only for `cargo test`), so they are checked against the traits. The backend examples are
+  sketches: their types are defined (hidden) and their bodies are `todo!()`; the
+  multi-threaded example spawns through a hidden stand-in with `tokio::spawn`'s
+  `Send + 'static` bound, so the doctest checks that the `Send` twin's futures can be
+  spawned.
+
 ## [0.3.1] - 2026-11-03
 
 ### Changed

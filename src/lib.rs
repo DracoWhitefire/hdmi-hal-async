@@ -31,3 +31,8 @@ pub use hdmi_hal::phy::{
 /// The FRL rate, as `HdmiPhy::set_frl_rate` takes it; re-exported so that implementations
 /// name the same type this crate does.
 pub use hdmi_hal::HdmiForumFrl;
+
+// Compiles and runs the README's examples as doctests.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;

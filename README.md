@@ -45,18 +45,24 @@ Implement a trait against your async hardware backend:
 use hdmi_hal_async::scdc::ScdcTransport;
 
 struct MyAsyncI2cBackend { /* ... */ }
+# #[derive(Debug)]
+# struct MyError;
 
 impl ScdcTransport for MyAsyncI2cBackend {
     type Error = MyError;
 
-    async fn read(&self, reg: u8) -> Result<u8, MyError> { /* ... */ }
-    async fn write(&mut self, reg: u8, value: u8) -> Result<(), MyError> { /* ... */ }
+    async fn read(&self, reg: u8) -> Result<u8, MyError> { todo!("read one register") }
+    async fn write(&mut self, reg: u8, value: u8) -> Result<(), MyError> {
+        todo!("write one register")
+    }
 
     // One DDC transaction for the whole buffer (a length limit, if any, of at least
     // 16 bytes). A backend that cannot burst-read
     // implements this with `hdmi_hal_async::scdc::read_block_bytewise(self, reg, buf).await`
     // and says so: its reads are then one register at a time.
-    async fn read_block(&self, reg: u8, buf: &mut [u8]) -> Result<(), MyError> { /* ... */ }
+    async fn read_block(&self, reg: u8, buf: &mut [u8]) -> Result<(), MyError> {
+        todo!("read buf.len() registers from reg")
+    }
 }
 ```
 
@@ -85,13 +91,20 @@ that are `Send`, with errors that are `Send`. A transport twin is also `Sync`, b
 
 ```rust
 use hdmi_hal_async::scdc::SendScdcTransport;
+# struct MyThreadSafeBackend;
+# #[derive(Debug)]
+# struct MyError;
+# // A stand-in with tokio::spawn's bound: the future must be `Send + 'static`.
+# mod tokio {
+#     pub fn spawn<F: core::future::Future + Send + 'static>(_future: F) {}
+# }
 
 impl SendScdcTransport for MyThreadSafeBackend {
     type Error = MyError;
 
-    async fn read(&self, reg: u8) -> Result<u8, MyError> { /* ... */ }
-    async fn write(&mut self, reg: u8, value: u8) -> Result<(), MyError> { /* ... */ }
-    async fn read_block(&self, reg: u8, buf: &mut [u8]) -> Result<(), MyError> { /* ... */ }
+    async fn read(&self, reg: u8) -> Result<u8, MyError> { todo!() }
+    async fn write(&mut self, reg: u8, value: u8) -> Result<(), MyError> { todo!() }
+    async fn read_block(&self, reg: u8, buf: &mut [u8]) -> Result<(), MyError> { todo!() }
 }
 
 fn spawn_frl_start<T: SendScdcTransport + 'static>(mut transport: T) {
