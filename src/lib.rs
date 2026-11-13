@@ -12,6 +12,7 @@
 
 #![no_std]
 #![forbid(unsafe_code)]
+#![deny(missing_docs)]
 // async fn in traits does not guarantee Send on the returned futures. This is intentional
 // for the plain traits: they serve single-threaded embedded executors (e.g. Embassy), where
 // Send is not required, the same decision embedded-hal-async made. The Send twins
@@ -31,3 +32,8 @@ pub use hdmi_hal::phy::{
 /// The FRL rate, as `HdmiPhy::set_frl_rate` takes it; re-exported so that implementations
 /// name the same type this crate does.
 pub use hdmi_hal::HdmiForumFrl;
+
+// Compiles and runs the README's examples as doctests.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;
