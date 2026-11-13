@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   publishing section says that hdmi-hal-async re-exports hdmi-hal's value types.
 - **The README's documentation list links `doc/setup.md`, `doc/testing.md` and
   `CONTRIBUTING.md`.**
+- **The publish workflow's `verify` job fails on a `[patch]` section** too, as `ci.yml`
+  does on `main`: the release does not wait for `main`'s CI.
 
 ## [0.3.1] - 2026-11-03
 
