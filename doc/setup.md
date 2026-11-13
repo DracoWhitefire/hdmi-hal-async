@@ -14,8 +14,40 @@ cargo build
 
 ```sh
 cargo fmt --check
-cargo clippy -- -D warnings
-cargo rustdoc -- -D missing_docs
+cargo clippy --all-targets -- -D warnings
+cargo rustdoc --all-features -- -D warnings
+```
+
+## Running tests
+
+```sh
+cargo test
+```
+
+The async tests run on `pollster`, so no runtime is needed; the README's examples run as
+doctests with the others. See [testing.md](testing.md) for what the tests cover.
+
+## `no_std` builds
+
+The crate is `no_std` without `alloc`. CI checks it on a bare target, which has no `std`
+for a dependency to pull in:
+
+```sh
+rustup target add thumbv7em-none-eabi
+cargo build --target thumbv7em-none-eabi
+```
+
+## Checking the MSRV
+
+The MSRV is `rust-version` in `Cargo.toml`. CI checks it with
+[`cargo-msrv`](https://github.com/foresterre/cargo-msrv), which runs the checks on that
+toolchain:
+
+```sh
+cargo install cargo-msrv --locked
+cargo msrv verify -- cargo test --locked
+cargo msrv verify --target thumbv7em-none-eabi \
+  -- cargo build --locked --no-default-features --target thumbv7em-none-eabi
 ```
 
 ## Measuring coverage

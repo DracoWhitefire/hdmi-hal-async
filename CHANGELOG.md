@@ -45,6 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   uncovered (it did so in other Ashlar crates after the update to Rust 1.100).
 - **`doc/testing.md` describes the tests**: what each module's unit tests check, how the
   README's examples are compiled, the builds CI runs and the coverage ratchet.
+- **`doc/setup.md` lists the checks CI runs**: clippy over all targets, rustdoc with
+  `-D warnings`, the tests, the bare-metal build and the MSRV check.
 
 ## [0.3.1] - 2026-11-03
 
