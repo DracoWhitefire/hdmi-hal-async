@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   multi-threaded example spawns through a hidden stand-in with `tokio::spawn`'s
   `Send + 'static` bound, so the doctest checks that the `Send` twin's futures can be
   spawned.
+- **The published `.crate` holds only what the crate needs**: `include` in `Cargo.toml`
+  limits it to the sources, `doc/`, the README, changelog and license; it also shipped the
+  CI workflows, Dependabot configuration and coverage baseline.
 
 ## [0.3.1] - 2026-11-03
 
