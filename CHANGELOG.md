@@ -54,6 +54,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `CONTRIBUTING.md`.**
 - **The publish workflow's `verify` job fails on a `[patch]` section** too, as `ci.yml`
   does on `main`: the release does not wait for `main`'s CI.
+- **`CONTRIBUTING.md` states the provenance rule** for claims about HDMI behaviour (two
+  independent public implementations, cited), and `CONTRIBUTING.md` and `doc/setup.md`
+  give the coverage tolerance as 0.1 percentage points, as CI checks it, not 0.1%.
 
 ## [0.3.1] - 2026-11-03
 
