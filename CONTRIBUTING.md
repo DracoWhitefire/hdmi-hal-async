@@ -53,8 +53,9 @@ known consumers in the stack.
 ## Publishing and downstream dependencies
 
 `hdmi-hal-async` builds on [hdmi-hal](https://github.com/ashlar-display/hdmi-hal) and
-re-exports its value types, so a breaking release of hdmi-hal is a breaking release of
-hdmi-hal-async. It is consumed by `culvert-async`, `plumbob-async`, and async platform
+re-exports its value types, so moving to a breaking release of hdmi-hal is a breaking
+release of hdmi-hal-async, unless the version requirement keeps accepting the old release
+as well. It is consumed by `culvert-async`, `plumbob-async`, and async platform
 backend crates as a versioned dependency. Changes that add or modify public API must be
 merged, tagged, and published to crates.io before downstream crates can adopt them.
 The workflow is:
