@@ -43,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `target/` built by an older Rust is not restored: `cargo llvm-cov clean --workspace`
   leaves its instrumented binaries behind, and the report would count their lines as
   uncovered (it did so in other Ashlar crates after the update to Rust 1.100).
+- **`doc/testing.md` describes the tests**: what each module's unit tests check, how the
+  README's examples are compiled, the builds CI runs and the coverage ratchet.
 
 ## [0.3.1] - 2026-11-03
 
