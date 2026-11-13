@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   CI workflows, Dependabot configuration and coverage baseline.
 - **`#![deny(missing_docs)]` in `lib.rs`**: an undocumented public item fails a local
   build, not only CI's rustdoc step.
+- **CI runs with a read-only token by default**: `ci.yml` sets `permissions: contents: read`;
+  the coverage job keeps the write permissions it needs to open its ratchet PR. The test job
+  ran with the repository's default token permissions.
 
 ## [0.3.1] - 2026-11-03
 
