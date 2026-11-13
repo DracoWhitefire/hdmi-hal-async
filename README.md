@@ -110,6 +110,11 @@ alone, as above: adding `+ ScdcTransport` or `+ HdmiPhy`, which the twins imply 
 makes the compiler use that bound instead of the blanket implementation, and the futures
 are no longer known to be `Send`.
 
+## `no_std`
+
+`hdmi-hal-async` is `#![no_std]` and needs no allocator; the traits use `async fn`, so any
+executor can drive them, including those for bare-metal targets.
+
 ## Stack position
 
 `hdmi-hal-async` mirrors `hdmi-hal`'s position in the stack, serving async platform
